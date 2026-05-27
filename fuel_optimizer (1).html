@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fuel Optimizer</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.7.0/tabler-icons.min.css">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;700&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Syne',sans-serif;background:#0c0c0c;color:#e8e2d0;min-height:100vh}
+  .app{max-width:720px;margin:0 auto;padding:1.5rem 1.25rem 4rem}
+  .header{display:flex;align-items:center;gap:12px;margin-bottom:2rem;padding-bottom:1.25rem;border-bottom:0.5px solid #232323}
+  .hico{width:38px;height:38px;background:#c8f064;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+  .header h1{font-size:18px;font-weight:700;color:#e8e2d0;letter-spacing:-0.02em}
+  .header p{font-size:11px;color:#555;font-family:'DM Mono',monospace;margin-top:2px}
+  .loc-btn{margin-left:auto;display:flex;align-items:center;gap:5px;font-family:'DM Mono',monospace;font-size:11px;color:#c8f064;background:#111d08;border:0.5px solid #2d4a1a;border-radius:6px;padding:6px 10px;cursor:pointer;white-space:nowrap;flex-shrink:0}
+  .loc-btn:hover{background:#182e10}
+  .card{background:#141414;border:0.5px solid #232323;border-radius:13px;padding:1.25rem;margin-bottom:.75rem}
+  .sec-label{font-size:10px;font-family:'DM Mono',monospace;color:#555;letter-spacing:.09em;text-transform:uppercase;margin-bottom:1rem}
+  .g2{display:grid;grid-template-columns:1fr 1fr;gap:.875rem}
+  .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.875rem}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field label{font-size:10px;color:#555;font-family:'DM Mono',monospace}
+  .field input[type=number],.field select{background:#0c0c0c;border:0.5px solid #2a2a2a;border-radius:8px;color:#e8e2d0;font-family:'DM Mono',monospace;font-size:12px;padding:8px 10px;outline:none;width:100%;transition:border-color .15s}
+  .field input:focus,.field select:focus{border-color:#c8f064}
+  .field select option{background:#141414}
+  .tog-row{display:flex;gap:5px;margin-top:1px}
+  .tog{flex:1;padding:7px 0;border:0.5px solid #2a2a2a;border-radius:7px;background:#0c0c0c;color:#666;font-family:'Syne',sans-serif;font-size:11px;cursor:pointer;transition:all .12s}
+  .tog.on{border-color:#c8f064;color:#c8f064;background:#111d08}
+  .gauge-wrap{display:flex;flex-direction:column;gap:7px;margin-top:.5rem}
+  .gauge-top{display:flex;justify-content:space-between;align-items:center}
+  .gauge-top label{font-size:10px;color:#555;font-family:'DM Mono',monospace}
+  .gauge-val{font-family:'DM Mono',monospace;font-size:12px;color:#c8f064}
+  .gauge-track{width:100%;height:7px;background:#1e1e1e;border-radius:99px;overflow:hidden}
+  .gauge-fill{height:100%;background:#c8f064;border-radius:99px;transition:width .18s}
+  .gauge-lbls{display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:10px;color:#444}
+  .sum-pill{display:inline-flex;align-items:center;gap:6px;background:#111d08;border:0.5px solid #2d4a1a;border-radius:99px;padding:5px 12px;font-family:'DM Mono',monospace;font-size:11px;color:#c8f064;margin-top:.875rem}
+  .dest-wrap{position:relative}
+  .dest-inp{width:100%;background:#0c0c0c;border:0.5px solid #2a2a2a;border-radius:9px;color:#e8e2d0;font-family:'DM Mono',monospace;font-size:12px;padding:10px 12px;outline:none;transition:border-color .15s}
+  .dest-inp:focus{border-color:#c8f064}
+  .dest-inp::placeholder{color:#3a3a3a}
+  .autocomplete-list{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#1a1a1a;border:0.5px solid #2a2a2a;border-radius:9px;overflow:hidden;z-index:100;display:none}
+  .autocomplete-list.open{display:block}
+  .ac-item{padding:9px 12px;font-family:'DM Mono',monospace;font-size:11px;color:#a0a090;cursor:pointer;border-bottom:0.5px solid #1e1e1e;line-height:1.4;transition:background .1s}
+  .ac-item:last-child{border-bottom:none}
+  .ac-item:hover,.ac-item.active{background:#222;color:#e8e2d0}
+  .mode-bar{display:flex;gap:0;margin-bottom:1rem;border:0.5px solid #2a2a2a;border-radius:8px;overflow:hidden}
+  .mode-btn{flex:1;padding:8px 0;background:#0c0c0c;color:#555;font-family:'Syne',sans-serif;font-size:11px;font-weight:500;border:none;cursor:pointer;transition:all .12s;border-right:0.5px solid #2a2a2a}
+  .mode-btn:last-child{border-right:none}
+  .mode-btn.on{background:#111d08;color:#c8f064}
+  .corridor-opts{display:none;margin-top:.75rem;padding-top:.75rem;border-top:0.5px solid #1e1e1e}
+  .corridor-opts.show{display:block}
+  .info-note{font-family:'DM Mono',monospace;font-size:10px;color:#555;line-height:1.5;margin-top:.5rem;padding:.5rem .75rem;background:#111;border-radius:6px;border-left:2px solid #2d4a1a}
+  .cta{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;padding:13px;background:#c8f064;color:#0c0c0c;border:none;border-radius:9px;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer;margin-top:.75rem;transition:all .15s;letter-spacing:-.01em}
+  .cta:hover:not(:disabled){background:#d6f87a;transform:translateY(-1px)}
+  .cta:disabled{opacity:.45;cursor:default;transform:none}
+  .spinner{display:inline-block;width:14px;height:14px;border:2px solid #0c0c0c44;border-top-color:#0c0c0c;border-radius:50%;animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .res-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;margin-top:1.25rem}
+  .res-hdr h2{font-size:10px;font-family:'DM Mono',monospace;color:#555;letter-spacing:.08em;text-transform:uppercase}
+  .res-meta{font-family:'DM Mono',monospace;font-size:10px;color:#444}
+  .filter-bar{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:.75rem;padding:.875rem 1rem;background:#141414;border:0.5px solid #232323;border-radius:11px}
+  .chip{font-family:'DM Mono',monospace;font-size:10px;padding:4px 10px;border-radius:99px;border:0.5px solid #2a2a2a;background:transparent;color:#555;cursor:pointer;transition:all .12s}
+  .chip.on{border-color:#c8f064;color:#c8f064;background:#111d08}
+  .sep{width:.5px;background:#252525;height:20px;flex-shrink:0}
+  .rng-wrap{display:flex;align-items:center;gap:8px;flex:1;min-width:160px}
+  .rng-wrap label{font-size:10px;color:#444;font-family:'DM Mono',monospace;white-space:nowrap}
+  .rng-wrap input[type=range]{flex:1;accent-color:#c8f064}
+  .rng-val{font-family:'DM Mono',monospace;font-size:11px;color:#c8f064;min-width:30px;text-align:right}
+  .scard{background:#141414;border:0.5px solid #232323;border-radius:11px;padding:.875rem 1rem;margin-bottom:7px;display:grid;grid-template-columns:1fr auto;gap:8px;align-items:start}
+  .scard.best{border-color:#2d4a1a;background:#0f1a0a}
+  .scard.hidden{display:none}
+  .sc-top{display:flex;align-items:center;gap:6px;margin-bottom:5px;flex-wrap:wrap}
+  .sc-name{font-size:12px;font-weight:500;color:#e8e2d0}
+  .bbadge{font-family:'DM Mono',monospace;font-size:9px;color:#555;background:#1e1e1e;border-radius:3px;padding:2px 5px}
+  .corridor-badge{font-family:'DM Mono',monospace;font-size:9px;color:#7ba8f0;background:#0d1a2e;border:0.5px solid #1e3a6e;border-radius:3px;padding:2px 5px}
+  .sc-meta{display:flex;gap:12px;font-family:'DM Mono',monospace;font-size:10px;color:#555;flex-wrap:wrap}
+  .nav-link{display:inline-flex;align-items:center;gap:4px;font-family:'DM Mono',monospace;font-size:10px;color:#555;text-decoration:none;border:0.5px solid #2a2a2a;border-radius:5px;padding:3px 7px;margin-top:6px;transition:all .12s}
+  .nav-link:hover{border-color:#444;color:#888}
+  .price-col{text-align:right;flex-shrink:0}
+  .p-listed{font-family:'DM Mono',monospace;font-size:10px;color:#444;text-decoration:line-through}
+  .p-eff{font-family:'DM Mono',monospace;font-size:15px;font-weight:500;color:#e8e2d0}
+  .p-sub{font-family:'DM Mono',monospace;font-size:9px;color:#444;margin-bottom:3px}
+  .p-save{font-family:'DM Mono',monospace;font-size:10px;color:#c8f064}
+  .p-total{font-family:'DM Mono',monospace;font-size:10px;color:#444;margin-top:2px}
+  .p-best{font-family:'DM Mono',monospace;font-size:11px;color:#c8f064;font-weight:500}
+  .err-box{background:#1a0a0a;border:0.5px solid #3d1c1c;border-radius:9px;padding:.875rem 1rem;font-family:'DM Mono',monospace;font-size:11px;color:#f08080;margin-top:.75rem}
+  .warn-box{background:#141408;border:0.5px solid #3d3a1c;border-radius:9px;padding:.875rem 1rem;font-family:'DM Mono',monospace;font-size:11px;color:#c8b860;margin-top:.75rem}
+  .progress-bar{height:3px;background:#1e1e1e;border-radius:99px;margin-top:.75rem;overflow:hidden;display:none}
+  .progress-fill{height:100%;background:#c8f064;border-radius:99px;transition:width .3s}
+  @media(max-width:500px){.g3{grid-template-columns:1fr 1fr}.sc-meta{gap:7px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="hico">⛽</div>
+    <div>
+      <h1>Fuel Optimizer</h1>
+      <p id="loc-label">NSW FuelCheck · TomTom Routing</p>
+    </div>
+    <button class="loc-btn" id="loc-btn" onclick="detectLocation()">
+      <i class="ti ti-current-location"></i>
+      <span id="loc-btn-txt">Detect Location</span>
+    </button>
+  </div>
+
+  <!-- Vehicle settings -->
+  <div class="card">
+    <div class="sec-label">Vehicle & Trip</div>
+    <div class="g2" style="margin-bottom:.875rem">
+      <div class="field">
+        <label>Fuel Economy (L/100km)</label>
+        <input type="number" id="economy" value="8.5" step="0.5" min="1" max="30" oninput="updateSummary()">
+      </div>
+      <div class="field">
+        <label>Tank Capacity (L)</label>
+        <input type="number" id="tank" value="60" step="5" min="10" max="200" oninput="updateSummary()">
+      </div>
+    </div>
+    <div class="g3" style="margin-bottom:.875rem">
+      <div class="field">
+        <label>Fuel Type</label>
+        <select id="fueltype" onchange="updateSummary()">
+          <option>E10</option><option>U91</option><option>U95</option>
+          <option>U98</option><option>P98</option><option>Diesel</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Trip Mode</label>
+        <div class="tog-row">
+          <button class="tog on" id="tog-one" onclick="setTrip('one')">One Way</button>
+          <button class="tog" id="tog-ret" onclick="setTrip('return')">Return</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Override Fill (L, 0=auto)</label>
+        <input type="number" id="manual-vol" value="0" step="1" min="0" max="200" oninput="updateSummary()">
+      </div>
+    </div>
+    <div class="gauge-wrap">
+      <div class="gauge-top">
+        <label>Current Tank Level</label>
+        <span class="gauge-val" id="gauge-label">25%</span>
+      </div>
+      <input type="range" min="0" max="100" step="5" value="25" id="gauge" style="width:100%;accent-color:#c8f064" oninput="updateGauge()">
+      <div class="gauge-track"><div class="gauge-fill" id="gauge-fill" style="width:25%"></div></div>
+      <div class="gauge-lbls"><span>Empty</span><span>Half</span><span>Full</span></div>
+    </div>
+    <div class="sum-pill" id="sum-pill">
+      <i class="ti ti-droplet"></i>
+      Will fill <strong style="color:#e8e2d0;margin:0 3px" id="fill-l">45.0 L</strong> of <span id="fill-ft">E10</span>
+    </div>
+  </div>
+
+  <!-- Search mode + destination -->
+  <div class="card">
+    <div class="sec-label">Search Mode</div>
+    <div class="mode-bar">
+      <button class="mode-btn on" id="mode-near" onclick="setMode('near')">
+        <i class="ti ti-map-pin"></i> Near Me
+      </button>
+      <button class="mode-btn" id="mode-corridor" onclick="setMode('corridor')">
+        <i class="ti ti-route"></i> Along Route
+      </button>
+    </div>
+
+    <!-- Near Me options -->
+    <div id="near-opts">
+      <div class="field">
+        <label>Search Radius around me</label>
+        <div style="display:flex;align-items:center;gap:7px;margin-top:4px">
+          <input type="range" min="5" max="50" step="5" value="10" id="radius" style="flex:1;accent-color:#c8f064" oninput="document.getElementById('rad-val').textContent=this.value+'km'">
+          <span style="font-family:'DM Mono',monospace;font-size:11px;color:#c8f064;min-width:32px" id="rad-val">10km</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Along Route options -->
+    <div class="corridor-opts" id="corridor-opts">
+      <div class="g2">
+        <div class="field">
+          <label>Corridor Width (km off route)</label>
+          <div style="display:flex;align-items:center;gap:7px;margin-top:4px">
+            <input type="range" min="1" max="15" step="1" value="5" id="corridor-width" style="flex:1;accent-color:#c8f064" oninput="document.getElementById('cw-val').textContent=this.value+'km'">
+            <span style="font-family:'DM Mono',monospace;font-size:11px;color:#c8f064;min-width:32px" id="cw-val">5km</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Sample every (km along route)</label>
+          <div style="display:flex;align-items:center;gap:7px;margin-top:4px">
+            <input type="range" min="5" max="30" step="5" value="10" id="sample-km" style="flex:1;accent-color:#c8f064" oninput="document.getElementById('sk-val').textContent=this.value+'km'">
+            <span style="font-family:'DM Mono',monospace;font-size:11px;color:#c8f064;min-width:32px" id="sk-val">10km</span>
+          </div>
+        </div>
+      </div>
+      <div class="info-note">
+        The full route polyline is fetched from TomTom. Stations are searched at points sampled every N km along the route, within the corridor width. Covers the entire trip — including near the destination.
+      </div>
+    </div>
+
+    <div style="margin-top:1rem">
+      <div class="sec-label" style="margin-bottom:.5rem">Destination</div>
+      <div class="dest-wrap">
+        <input class="dest-inp" type="text" id="dest" placeholder="e.g. Mt Annan, Airds, Sydney Airport…" autocomplete="off" oninput="onDestInput()" onkeydown="onDestKey(event)">
+        <div class="autocomplete-list" id="ac-list"></div>
+      </div>
+    </div>
+
+    <button class="cta" id="cta-btn" onclick="runSearch()">
+      <i class="ti ti-bolt"></i> Find Best Station · Ranked by Savings
+    </button>
+    <div class="progress-bar" id="prog-bar">
+      <div class="progress-fill" id="prog-fill" style="width:0%"></div>
+    </div>
+  </div>
+
+  <div id="error-box" style="display:none" class="err-box"></div>
+  <div id="warn-box" style="display:none" class="warn-box"></div>
+
+  <div id="results-section" style="display:none">
+    <div class="res-hdr">
+      <h2>Results</h2>
+      <span class="res-meta" id="res-meta"></span>
+    </div>
+    <div class="filter-bar">
+      <button class="chip on" id="chip-all" onclick="setFilter('all')">All</button>
+      <button class="chip" id="chip-rt" onclick="setFilter('route')">
+        <i class="ti ti-route"></i> On-Route
+      </button>
+      <div class="sep"></div>
+      <div class="rng-wrap">
+        <label>Max detour</label>
+        <input type="range" min="0" max="20" step="1" value="20" id="detour-f" oninput="applyFilters()">
+        <span class="rng-val" id="detour-v">any</span>
+      </div>
+    </div>
+    <div id="station-list"></div>
+  </div>
+</div>
+
+<script>
+  const NSW_API_KEY = "1MYSRAx5yvqHUZc6VGtxix6oMA2qgfRT";
+  const NSW_AUTH    = "Basic MU1ZU1JBeDV5dnFIVVpjNlZHdHhpeDZvTUEycWdmUlQ6Qk12V2FjdzE1RXQ4dUZHRg==";
+  const TOMTOM_KEY  = "RoiDwi5Y35NaVKTJEyFTX5VtED45vS2e";
+
+  let tripMode = 'one', filterMode = 'all', searchMode = 'near';
+  let userLat = null, userLon = null;
+
+  // ── Haversine straight-line distance ──────────────────────────────────────────
+  function haversineRaw(lat1,lon1,lat2,lon2){
+    const R=6371,dLat=(lat2-lat1)*Math.PI/180,dLon=(lon2-lon1)*Math.PI/180;
+    const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+    return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+  }
+  function haversine(lat1,lon1,lat2,lon2){ return haversineRaw(lat1,lon1,lat2,lon2)*1.28; }
+
+  // ── TomTom road distance ──────────────────────────────────────────────────────
+  async function tomtomDist(olat,olon,dlat,dlon){
+    try{
+      const url=`https://api.tomtom.com/routing/1/calculateRoute/${olat},${olon}:${dlat},${dlon}/json?key=${TOMTOM_KEY}&travelMode=car&routeType=fastest`;
+      const r=await fetch(url,{signal:AbortSignal.timeout(8000)});
+      if(!r.ok) throw new Error('TomTom '+r.status);
+      const d=await r.json();
+      return d.routes[0].summary.lengthInMeters/1000;
+    }catch{ return haversine(olat,olon,dlat,dlon); }
+  }
+
+  // ── TomTom full route with polyline ──────────────────────────────────────────
+  async function tomtomRoute(olat,olon,dlat,dlon){
+    const url=`https://api.tomtom.com/routing/1/calculateRoute/${olat},${olon}:${dlat},${dlon}/json?key=${TOMTOM_KEY}&travelMode=car&routeType=fastest`;
+    const r=await fetch(url,{signal:AbortSignal.timeout(10000)});
+    if(!r.ok) throw new Error('TomTom route failed: '+r.status);
+    const d=await r.json();
+    const route=d.routes[0];
+    const distKm=route.summary.lengthInMeters/1000;
+    // Flatten all leg points into a single polyline array
+    const points=[];
+    for(const leg of route.legs){
+      for(const pt of leg.points) points.push([pt.latitude,pt.longitude]);
+    }
+    return {distKm, points};
+  }
+
+  // ── Sample points along polyline every N km ───────────────────────────────────
+  function samplePolyline(points, stepKm){
+    if(!points.length) return [];
+    const samples=[points[0]];
+    let accumulated=0;
+    for(let i=1;i<points.length;i++){
+      const d=haversineRaw(points[i-1][0],points[i-1][1],points[i][0],points[i][1]);
+      accumulated+=d;
+      if(accumulated>=stepKm){
+        samples.push(points[i]);
+        accumulated=0;
+      }
+    }
+    // Always include last point
+    const last=points[points.length-1];
+    if(samples[samples.length-1]!==last) samples.push(last);
+    return samples;
+  }
+
+  // ── Point-to-segment distance (km) ───────────────────────────────────────────
+  function ptToSegDist(plat,plon,alat,alon,blat,blon){
+    // Project point onto segment, return min distance in km
+    const dx=blon-alon, dy=blat-alat;
+    const lenSq=dx*dx+dy*dy;
+    if(lenSq===0) return haversineRaw(plat,plon,alat,alon);
+    let t=((plon-alon)*dx+(plat-alat)*dy)/lenSq;
+    t=Math.max(0,Math.min(1,t));
+    return haversineRaw(plat,plon,alat+t*dy,alon+t*dx);
+  }
+
+  // ── Min distance from a point to a polyline ───────────────────────────────────
+  function distToPolyline(lat,lon,points){
+    let minD=Infinity;
+    for(let i=1;i<points.length;i++){
+      const d=ptToSegDist(lat,lon,points[i-1][0],points[i-1][1],points[i][0],points[i][1]);
+      if(d<minD) minD=d;
+    }
+    return minD;
+  }
+
+  // ── Nominatim geocoding ───────────────────────────────────────────────────────
+  async function geocode(q){
+    const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&countrycodes=au`,
+      {headers:{'User-Agent':'FuelOptimizer/2.0'}});
+    const d=await r.json();
+    if(!d.length) throw new Error('Could not geocode: '+q);
+    return[parseFloat(d[0].lat),parseFloat(d[0].lon)];
+  }
+
+  // ── NSW FuelCheck token ───────────────────────────────────────────────────────
+  async function getNSWToken(){
+    const r=await fetch('https://api.onegov.nsw.gov.au/oauth/client_credential/accesstoken?grant_type=client_credentials',
+      {headers:{Authorization:NSW_AUTH}});
+    if(!r.ok) throw new Error('NSW auth failed: '+r.status);
+    return (await r.json()).access_token;
+  }
+
+  // ── NSW FuelCheck stations near a point ───────────────────────────────────────
+  async function fetchStations(lat,lon,radiusKm,fuelType,token){
+    const r=await fetch('https://api.onegov.nsw.gov.au/FuelPriceCheck/v1/fuel/prices/nearby',{
+      method:'POST',
+      headers:{Authorization:`Bearer ${token}`,apikey:NSW_API_KEY,'Content-Type':'application/json; charset=utf-8',transactionid:'1',requesttimestamp:'01/01/2024 00:00:00 AM'},
+      body:JSON.stringify({FuelType:fuelType,Latitude:lat,Longitude:lon,Radius:radiusKm,SortBy:'Price'})
+    });
+    if(!r.ok) throw new Error('NSW FuelCheck: '+r.status);
+    return r.json();
+  }
+
+  // ── Parse raw NSW response into station list ──────────────────────────────────
+  function parseStations(rawData, fallbackLat, fallbackLon){
+    const priceLookup={};
+    (rawData.prices||[]).forEach(p=>{if(p.price!=null) priceLookup[p.stationcode]=parseFloat(p.price)/100;});
+    return (rawData.stations||[])
+      .filter(s=>priceLookup[s.code]!=null)
+      .map(s=>({
+        name:s.name||'Unknown', brand:s.brand||'',
+        price:priceLookup[s.code],
+        lat:parseFloat(s.location?.latitude||fallbackLat),
+        lon:parseFloat(s.location?.longitude||fallbackLon),
+        address:s.address||''
+      }));
+  }
+
+  // ── GPS detection ─────────────────────────────────────────────────────────────
+  function detectLocation(){
+    document.getElementById('loc-btn-txt').textContent='Locating…';
+    if(!navigator.geolocation){showErr('Geolocation not supported.');return}
+    navigator.geolocation.getCurrentPosition(
+      pos=>{
+        userLat=pos.coords.latitude; userLon=pos.coords.longitude;
+        document.getElementById('loc-btn-txt').textContent=`${userLat.toFixed(4)}, ${userLon.toFixed(4)}`;
+        document.getElementById('loc-label').textContent='📍 GPS location active';
+      },
+      ()=>{
+        document.getElementById('loc-btn-txt').textContent='Location denied';
+        showWarn('Location access denied — using Sydney CBD.');
+        userLat=-33.8688; userLon=151.2093;
+      }
+    );
+  }
+
+  // ── UI helpers ────────────────────────────────────────────────────────────────
+  function updateGauge(){
+    const v=document.getElementById('gauge').value;
+    document.getElementById('gauge-fill').style.width=v+'%';
+    document.getElementById('gauge-label').textContent=v+'%';
+    updateSummary();
+  }
+  function updateSummary(){
+    const tank=parseFloat(document.getElementById('tank').value)||60;
+    const pct=parseFloat(document.getElementById('gauge').value)||25;
+    const mv=parseFloat(document.getElementById('manual-vol').value)||0;
+    const ft=document.getElementById('fueltype').value;
+    const fill=mv>0?mv.toFixed(1):(tank*(1-pct/100)).toFixed(1);
+    document.getElementById('fill-l').textContent=fill+' L';
+    document.getElementById('fill-ft').textContent=ft;
+  }
+  function setTrip(m){
+    tripMode=m;
+    document.getElementById('tog-one').classList.toggle('on',m==='one');
+    document.getElementById('tog-ret').classList.toggle('on',m==='return');
+  }
+  function setMode(m){
+    searchMode=m;
+    document.getElementById('mode-near').classList.toggle('on',m==='near');
+    document.getElementById('mode-corridor').classList.toggle('on',m==='corridor');
+    document.getElementById('near-opts').style.display=m==='near'?'block':'none';
+    document.getElementById('corridor-opts').classList.toggle('show',m==='corridor');
+  }
+  function setFilter(m){
+    filterMode=m;
+    document.getElementById('chip-all').classList.toggle('on',m==='all');
+    document.getElementById('chip-rt').classList.toggle('on',m==='route');
+    applyFilters();
+  }
+  function applyFilters(){
+    const maxD=parseInt(document.getElementById('detour-f').value);
+    document.getElementById('detour-v').textContent=maxD>=20?'any':maxD+'km';
+    document.querySelectorAll('.scard').forEach(c=>{
+      const detour=parseFloat(c.dataset.detour);
+      let show=true;
+      if(filterMode==='route'&&detour>3) show=false;
+      if(maxD<20&&detour>maxD) show=false;
+      c.classList.toggle('hidden',!show);
+    });
+  }
+  function routeBadge(d){return d<=3?'✅':d<=8?'🔶':'❌';}
+  function showErr(msg){const b=document.getElementById('error-box');b.innerHTML='⚠ '+msg;b.style.display='block';}
+  function showWarn(msg){const b=document.getElementById('warn-box');b.innerHTML='ℹ '+msg;b.style.display='block';}
+  function clearMessages(){document.getElementById('error-box').style.display='none';document.getElementById('warn-box').style.display='none';}
+  function setBtn(html){document.getElementById('cta-btn').innerHTML=html;}
+  function setProgress(pct){
+    const bar=document.getElementById('prog-bar');
+    bar.style.display=pct>0&&pct<100?'block':'none';
+    document.getElementById('prog-fill').style.width=pct+'%';
+  }
+
+  // ── Render result cards ───────────────────────────────────────────────────────
+  function renderResults(stations, baseDist, mode){
+    const list=document.getElementById('station-list');
+    list.innerHTML='';
+    document.getElementById('res-meta').textContent=
+      `${stations.length} stations · ${baseDist.toFixed(1)} km direct · ${mode==='corridor'?'along-route search':'near-me search'}`;
+    document.getElementById('results-section').style.display='block';
+    stations.forEach((s,i)=>{
+      const el=document.createElement('div');
+      el.className='scard'+(i===0?' best':'');
+      el.dataset.detour=s.detour;
+      el.innerHTML=`
+        <div>
+          <div class="sc-top">
+            <span>${routeBadge(s.detour)}</span>
+            <span class="sc-name">${s.name}</span>
+            <span class="bbadge">${s.brand}</span>
+            ${mode==='corridor'&&s.corridorKm!=null?`<span class="corridor-badge">${s.corridorKm.toFixed(1)} km off route</span>`:''}
+          </div>
+          <div class="sc-meta">
+            <span><i class="ti ti-map-pin"></i> ${s.toStation.toFixed(1)} km from start</span>
+            <span><i class="ti ti-flag"></i> ${s.toDest.toFixed(1)} km to dest</span>
+            <span><i class="ti ti-arrows-right-left"></i> +${s.detour.toFixed(1)} km detour</span>
+            <span><i class="ti ti-gas-station"></i> $${s.fillCost.toFixed(2)} fill</span>
+          </div>
+          <a class="nav-link" href="https://waze.com/ul?ll=${s.lat},${s.lon}&navigate=yes" target="_blank">
+            <i class="ti ti-navigation"></i> Navigate via Waze
+          </a>
+        </div>
+        <div class="price-col">
+          <div class="p-listed">$${s.price.toFixed(3)}/L</div>
+          <div class="p-eff">$${s.effPrice.toFixed(3)}</div>
+          <div class="p-sub">eff/L</div>
+          ${i===0?`<div class="p-best">Best value</div>`:`<div class="p-save">save $${s.savings.toFixed(2)}</div>`}
+          <div class="p-total">$${s.total.toFixed(2)} total</div>
+        </div>`;
+      list.appendChild(el);
+    });
+    applyFilters();
+    document.getElementById('results-section').scrollIntoView({behavior:'smooth',block:'start'});
+  }
+
+  // ── Main search ───────────────────────────────────────────────────────────────
+  async function runSearch(){
+    clearMessages();
+    const dest=document.getElementById('dest').value.trim();
+    if(!dest){showErr('Please enter a destination.');return;}
+    if(!userLat){userLat=-33.8688;userLon=151.2093;showWarn('No GPS — using Sydney CBD. Click Detect Location for accuracy.');}
+
+    const btn=document.getElementById('cta-btn');
+    btn.disabled=true;
+    document.getElementById('results-section').style.display='none';
+    setProgress(5);
+
+    const economy   = parseFloat(document.getElementById('economy').value)||8.5;
+    const tank      = parseFloat(document.getElementById('tank').value)||60;
+    const gaugePct  = parseFloat(document.getElementById('gauge').value)||25;
+    const manualVol = parseFloat(document.getElementById('manual-vol').value)||0;
+    const fuelType  = document.getElementById('fueltype').value;
+    const tripMult  = tripMode==='return'?2:1;
+    const liters    = manualVol>0?manualVol:+(tank*(1-gaugePct/100)).toFixed(1);
+
+    try{
+      setBtn('<span class="spinner"></span> Geocoding destination…');
+      const[dLat,dLon]=await geocode(dest);
+      setProgress(15);
+
+      // ── Get NSW token once ──────────────────────────────────────────────────
+      setBtn('<span class="spinner"></span> Authenticating with NSW FuelCheck…');
+      let token;
+      try{ token=await getNSWToken(); }
+      catch(e){
+        showErr('NSW FuelCheck API error: '+e.message+'<br><br>This API requires server-side calls (CORS). Run via a local server or use the Streamlit version.');
+        btn.disabled=false; setBtn('<i class="ti ti-bolt"></i> Find Best Station · Ranked by Savings'); setProgress(0); return;
+      }
+      setProgress(25);
+
+      let rawStations=[];
+
+      if(searchMode==='near'){
+        // ── Near Me: single search around user location ─────────────────────
+        const radius=parseInt(document.getElementById('radius').value)||10;
+        setBtn(`<span class="spinner"></span> Fetching ${fuelType} prices within ${radius} km…`);
+        try{
+          const raw=await fetchStations(userLat,userLon,radius,fuelType,token);
+          rawStations=parseStations(raw,userLat,userLon);
+        }catch(e){ showErr('NSW FuelCheck: '+e.message); btn.disabled=false; setBtn('<i class="ti ti-bolt"></i> Find Best Station · Ranked by Savings'); setProgress(0); return; }
+
+      } else {
+        // ── Along Route: fetch polyline then search at sample points ─────────
+        const corridorWidth=parseInt(document.getElementById('corridor-width').value)||5;
+        const sampleKm=parseInt(document.getElementById('sample-km').value)||10;
+
+        setBtn('<span class="spinner"></span> Fetching full route polyline…');
+        let routeData;
+        try{ routeData=await tomtomRoute(userLat,userLon,dLat,dLon); }
+        catch(e){ showErr('TomTom route error: '+e.message); btn.disabled=false; setBtn('<i class="ti ti-bolt"></i> Find Best Station · Ranked by Savings'); setProgress(0); return; }
+
+        const samples=samplePolyline(routeData.points, sampleKm);
+        setProgress(35);
+
+        // Search around each sample point, deduplicate by station name+lat+lon
+        const seen=new Set();
+        for(let i=0;i<samples.length;i++){
+          const[sLat,sLon]=samples[i];
+          setBtn(`<span class="spinner"></span> Searching corridor… (${i+1}/${samples.length} points)`);
+          setProgress(35+Math.round((i/samples.length)*45));
+          try{
+            const raw=await fetchStations(sLat,sLon,corridorWidth+2,fuelType,token);
+            const found=parseStations(raw,sLat,sLon);
+            for(const s of found){
+              const key=`${s.name}|${s.lat.toFixed(4)}|${s.lon.toFixed(4)}`;
+              if(!seen.has(key)){
+                seen.add(key);
+                // Check actual distance to polyline
+                const offRoute=distToPolyline(s.lat,s.lon,routeData.points);
+                if(offRoute<=corridorWidth) rawStations.push({...s,corridorKm:offRoute});
+              }
+            }
+          }catch{ /* skip failed sample point */ }
+        }
+        setProgress(80);
+      }
+
+      if(!rawStations.length){
+        showWarn('No stations found. Try increasing the search radius / corridor width, or switching fuel type.');
+        btn.disabled=false; setBtn('<i class="ti ti-bolt"></i> Find Best Station · Ranked by Savings'); setProgress(0); return;
+      }
+
+      // ── Calculate road distances and costs ──────────────────────────────────
+      setBtn('<span class="spinner"></span> Calculating road distances…');
+      const baseDist=await tomtomDist(userLat,userLon,dLat,dLon);
+      setProgress(85);
+
+      const results=[];
+      const cap=Math.min(rawStations.length,25);
+      for(let i=0;i<cap;i++){
+        const s=rawStations[i];
+        setProgress(85+Math.round((i/cap)*12));
+        const legA=await tomtomDist(userLat,userLon,s.lat,s.lon);
+        const legB=await tomtomDist(s.lat,s.lon,dLat,dLon);
+        const detour=Math.max(0,(legA+legB)-baseDist);
+        const fillCost=liters*s.price;
+        const legACost=(legA*economy/100)*s.price;
+        const legBCost=(legB*tripMult*economy/100)*s.price;
+        const total=fillCost+legACost+legBCost;
+        const effPrice=liters>0?total/liters:s.price;
+        results.push({...s,toStation:legA,toDest:legB,detour,fillCost,total,effPrice,savings:0});
+      }
+
+      results.sort((a,b)=>a.total-b.total);
+      const worst=results[results.length-1].total;
+      results.forEach(r=>r.savings=worst-r.total);
+      setProgress(100);
+
+      renderResults(results,baseDist,searchMode);
+
+    }catch(e){ showErr(e.message); }
+
+    btn.disabled=false;
+    setBtn('<i class="ti ti-bolt"></i> Find Best Station · Ranked by Savings');
+    setProgress(0);
+  }
+
+  // ── Autocomplete ──────────────────────────────────────────────────────────────
+  let acIndex=-1, acResults=[], acTimer=null;
+  function onDestInput(){
+    clearTimeout(acTimer);
+    const q=document.getElementById('dest').value.trim();
+    if(q.length<3){closeAc();return;}
+    acTimer=setTimeout(()=>fetchAc(q),280);
+  }
+  async function fetchAc(q){
+    try{
+      const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=6&countrycodes=au`,{headers:{'User-Agent':'FuelOptimizer/2.0'}});
+      acResults=(await r.json()).map(d=>d.display_name);
+      renderAc();
+    }catch{}
+  }
+  function renderAc(){
+    const list=document.getElementById('ac-list');
+    if(!acResults.length){closeAc();return;}
+    acIndex=-1;
+    list.innerHTML=acResults.map((r,i)=>`<div class="ac-item" data-i="${i}" onmousedown="pickAc(${i})">${r}</div>`).join('');
+    list.classList.add('open');
+  }
+  function pickAc(i){document.getElementById('dest').value=acResults[i];closeAc();}
+  function closeAc(){document.getElementById('ac-list').classList.remove('open');acResults=[];acIndex=-1;}
+  function onDestKey(e){
+    const items=document.querySelectorAll('.ac-item');
+    if(!items.length)return;
+    if(e.key==='ArrowDown'){e.preventDefault();acIndex=Math.min(acIndex+1,items.length-1);highlightAc(items);}
+    else if(e.key==='ArrowUp'){e.preventDefault();acIndex=Math.max(acIndex-1,0);highlightAc(items);}
+    else if(e.key==='Enter'&&acIndex>=0){e.preventDefault();pickAc(acIndex);}
+    else if(e.key==='Escape') closeAc();
+  }
+  function highlightAc(items){
+    items.forEach((el,i)=>el.classList.toggle('active',i===acIndex));
+    if(acIndex>=0) items[acIndex].scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('click',e=>{if(!e.target.closest('.dest-wrap'))closeAc();});
+
+  // init
+  updateSummary();
+</script>
+</body>
+</html>
