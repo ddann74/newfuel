@@ -153,8 +153,8 @@
         </div>
       </div>
       <div class="field">
-        <label>Override Fill (L, 0=auto)</label>
-        <input type="number" id="manual-vol" value="0" step="1" min="0" max="200" oninput="updateSummary()">
+        <label>I want to spend ($, 0=auto)</label>
+        <input type="number" id="manual-spend" value="0" step="5" min="0" max="500" oninput="updateSummary()">
       </div>
     </div>
     <div class="gauge-wrap">
@@ -401,10 +401,14 @@
   function updateSummary(){
     const tank=parseFloat(document.getElementById('tank').value)||60;
     const pct=parseFloat(document.getElementById('gauge').value)||25;
-    const mv=parseFloat(document.getElementById('manual-vol').value)||0;
+    const spendAmt=parseFloat(document.getElementById('manual-spend').value)||0;
     const ft=document.getElementById('fueltype').value;
-    const fill=mv>0?mv.toFixed(1):(tank*(1-pct/100)).toFixed(1);
-    document.getElementById('fill-l').textContent=fill+' L';
+    if(spendAmt>0){
+      document.getElementById('fill-l').textContent='$'+spendAmt.toFixed(0)+' worth';
+    } else {
+      const fill=(tank*(1-pct/100)).toFixed(1);
+      document.getElementById('fill-l').textContent=fill+' L';
+    }
     document.getElementById('fill-ft').textContent=ft;
   }
   function setTrip(m){
@@ -536,7 +540,7 @@
         <div class="price-col">
           <div class="p-eff">$${s.price.toFixed(3)}</div>
           <div class="p-sub">per litre</div>
-          <div class="p-total">$${s.fillCost.toFixed(2)} to fill</div>
+          <div class="p-total">${s.spendLiters!=null?s.spendLiters.toFixed(1)+' L · ':''}$${s.fillCost.toFixed(2)} to fill</div>
           <div class="p-total">$${s.total.toFixed(2)} trip total</div>
           ${i===0?`<div class="p-best">Best value</div>`:`<div class="p-save">save $${s.savings.toFixed(2)}</div>`}
         </div>`;
@@ -569,10 +573,11 @@
     const economy  =parseFloat(document.getElementById('economy').value)||8.5;
     const tank     =parseFloat(document.getElementById('tank').value)||60;
     const gaugePct =parseFloat(document.getElementById('gauge').value)||25;
-    const manualVol=parseFloat(document.getElementById('manual-vol').value)||0;
+    const spendAmt =parseFloat(document.getElementById('manual-spend').value)||0;
     const fuelType =document.getElementById('fueltype').value;
     const tripMult =tripMode==='return'?2:1;
-    const liters   =manualVol>0?manualVol:+(tank*(1-gaugePct/100)).toFixed(1);
+    // liters is used as fallback (auto); when spendAmt>0, per-station litres computed below
+    const autoLiters=+(tank*(1-gaugePct/100)).toFixed(1);
     const rt       =routeType;
 
     try{
@@ -647,11 +652,12 @@
         const legA=await tomtomDist(userLat,userLon,s.lat,s.lon);
         const legB=await tomtomDist(s.lat,s.lon,dLat,dLon);
         const detour=Math.max(0,(legA+legB)-baseDist);
-        const fillCost=liters*s.price;
+        const liters=spendAmt>0?spendAmt/s.price:autoLiters;
+        const fillCost=spendAmt>0?spendAmt:liters*s.price;
         const legACost=(legA*economy/100)*s.price;
         const legBCost=(legB*tripMult*economy/100)*s.price;
         const total=fillCost+legACost+legBCost;
-        results.push({...s,toStation:legA,toDest:legB,detour,fillCost,total,savings:0,corridorKm:s.corridorKm??null});
+        results.push({...s,toStation:legA,toDest:legB,detour,fillCost,total,savings:0,corridorKm:s.corridorKm??null,spendLiters:spendAmt>0?liters:null});
       }
 
       setProgress(100);
