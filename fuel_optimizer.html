@@ -643,6 +643,13 @@
 
       setBtn('<span class="spinner"></span> Calculating road distances…');
       const baseDist=routeData.distKm;
+      // In corridor mode, rawStations is built by concatenating per-sample-point
+      // batches in route order, not price order - each batch is individually
+      // price-sorted by the API, but the combined list isn't. Sorting by price here,
+      // before the cap below, ensures the cap keeps the cheapest candidates overall
+      // rather than an arbitrary slice determined by which sample point happened to
+      // find them first.
+      rawStations.sort((a,b)=>a.price-b.price);
       const cap=Math.min(rawStations.length,25);
       const results=[];
 
