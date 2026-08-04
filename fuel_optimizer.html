@@ -368,12 +368,17 @@
     if(!r.ok)throw new Error('NSW FuelCheck: '+r.status);
     return r.json();
   }
-  function parseStations(raw,fLat,fLon){
+  function parseStations(raw){
     const pl={};
     (raw.prices||[]).forEach(p=>{if(p.price!=null)pl[p.stationcode]=parseFloat(p.price)/100;});
-    return(raw.stations||[]).filter(s=>pl[s.code]!=null).map(s=>({
+    // Stations with no reported coordinates used to fall back to the search center
+    // (your location, or a corridor sample point) - that made them look like a ~0km
+    // detour and let them pass every corridor-width check regardless of where they
+    // actually are, potentially crowding out a real, closer, cheaper station. Safer
+    // to drop them: a station whose location isn't known can't be ranked by distance.
+    return(raw.stations||[]).filter(s=>pl[s.code]!=null && s.location?.latitude!=null && s.location?.longitude!=null).map(s=>({
       name:s.name||'Unknown',brand:s.brand||'',price:pl[s.code],
-      lat:parseFloat(s.location?.latitude||fLat),lon:parseFloat(s.location?.longitude||fLon),
+      lat:parseFloat(s.location.latitude),lon:parseFloat(s.location.longitude),
       address:s.address||''
     }));
   }
@@ -608,7 +613,7 @@
         setBtn(`<span class="spinner"></span> Fetching ${fuelType} prices within ${radius} km…`);
         try{
           const raw=await fetchStations(userLat,userLon,radius,fuelType,token);
-          rawStations=parseStations(raw,userLat,userLon);
+          rawStations=parseStations(raw);
         }catch(e){showErr('NSW FuelCheck: '+e.message);btn.disabled=false;setBtn('<i class="ti ti-bolt"></i> Find Best Station · Ranked by Savings');setProgress(0);return;}
         setProgress(55);
 
@@ -616,14 +621,23 @@
         const corridorWidth=parseInt(document.getElementById('corridor-width').value)||5;
         const sampleKm=parseInt(document.getElementById('sample-km').value)||10;
         const samples=samplePolyline(routeData.points,sampleKm);
+        // Each sample only fetches within its own radius, so a station sitting
+        // between two samples (up to sampleKm apart) but still within corridorWidth
+        // of the route can be too far from EITHER sample's center to ever be
+        // fetched - never even reaching the corridor-width check below, let alone
+        // being priced or ranked. The radius has to cover half the gap to the next
+        // sample too, not just the corridor width itself, or coverage has holes
+        // (+1km extra for the route curving between samples rather than being
+        // perfectly straight).
+        const fetchRadius=corridorWidth+sampleKm/2+1;
         const seen=new Set();
         for(let i=0;i<samples.length;i++){
           const[sLat,sLon]=samples[i];
           setBtn(`<span class="spinner"></span> Scanning corridor… (${i+1}/${samples.length})`);
           setProgress(30+Math.round((i/samples.length)*35));
           try{
-            const raw=await fetchStations(sLat,sLon,corridorWidth+2,fuelType,token);
-            for(const s of parseStations(raw,sLat,sLon)){
+            const raw=await fetchStations(sLat,sLon,fetchRadius,fuelType,token);
+            for(const s of parseStations(raw)){
               const key=`${s.name}|${s.lat.toFixed(4)}|${s.lon.toFixed(4)}`;
               if(!seen.has(key)){
                 seen.add(key);
