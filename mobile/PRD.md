@@ -84,6 +84,22 @@ reading.
 - Re-run the price/corridor check periodically during a trip (interval
   TBD during build, tune against battery/API-call cost), not once.
 
+**Resolved 2026-08-09 — Waze's role is navigation-only, never
+calculation:** Waze has no official public API for routing/ETA (the
+only sanctioned developer access, the Waze Transport SDK, requires a
+business partnership Google/Waze doesn't offer to individual apps).
+Everything claiming to be "the Waze API" for route/ETA data (e.g.
+WazeRouteCalculator) scrapes Waze's internal, undocumented livemap
+endpoints — can break or get rate-limited without notice, and risks
+violating Waze's Terms of Service. TomTom (already the plan, §5.3, via
+the backend proxy) stays the sole source of truth for route polyline,
+ETA, and corridor/ahead-of-position matching. Waze's role stays exactly
+what §5.5's Navigate button already described: a deep link
+(`https://waze.com/ul?ll=<lat>,<lon>&navigate=yes`) handing off to the
+Waze app for turn-by-turn — the same sanctioned, documented mechanism
+the web app's `nav-link` already uses — never a data source this app's
+own calculations depend on.
+
 ### 5.4 Value threshold / alert trigger
 - User sets one of: a manual target price, or "X% below corridor/area
   average."
