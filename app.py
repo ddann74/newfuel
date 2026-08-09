@@ -1,14 +1,15 @@
 import streamlit as st
 import streamlit.components.v1 as components
-import os
+from pathlib import Path
 
 st.set_page_config(page_title="Fuel Optimizer", page_icon="⛽", layout="wide")
 
-# Build path relative to this script file
-dir = os.path.dirname(__file__)
-html_path = os.path.join(dir, "fuel_optimizer.html")
+STATIC_DIR = Path(__file__).parent / "static"
 
-with open(html_path, "r") as f:
-    html = f.read()
+html = (STATIC_DIR / "index.html").read_text()
+css = (STATIC_DIR / "style.css").read_text().rstrip("\n")
+js = (STATIC_DIR / "app.js").read_text().rstrip("\n")
+
+html = html.replace("{{CSS}}", css).replace("{{JS}}", js)
 
 components.html(html, height=900, scrolling=True)
