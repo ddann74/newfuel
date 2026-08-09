@@ -134,7 +134,33 @@ Rules for every iteration:
       right, does ActivityRecognition actually fire reliably, battery
       impact of the 30s location interval - untunable without a real
       device).
-- [ ] 4. `AlertEngine` — threshold + debounce logic, unit tested
+- [x] 4. `AlertEngine` — threshold + debounce logic, unit tested.
+      **Done 2026-08-09.** Built `alert/AlertEngine.kt`: both threshold
+      modes from PRD.md ss5.4 (`TargetPrice`, `PercentBelowAverage` -
+      the latter computed from the current live candidate set, not a
+      historical average), and the debounce/expiry model. **Resolved a
+      genuine ambiguity in PRD.md ss5.4 while building, documented in
+      the class doc rather than silently picked:** "never re-alert...
+      within a trip" vs. "expires once passed/out of radius" reads like
+      it could mean either "never re-alert this trip, period" or "muted
+      only while still a live candidate, un-muted the moment it's
+      passed." Went with the second reading - it's the one that
+      actually matches "expires," and the first reading would make
+      "expires" meaningless (nothing to expire if the mute never
+      lifts). `reset()` exists separately for genuine new-trip state
+      clearing, kept distinct from per-station expiry.
+
+      **Verified:** zero Android dependency, fully compiled and run for
+      real - 8 JUnit tests (both threshold modes, empty-candidate-list
+      doesn't crash, debounce holds while still a live candidate, mute
+      lifts and can re-alert after `expireStationsNotIn`, a still-live
+      station stays muted while an expired one doesn't, `reset()` clears
+      everything, a station that never clears the bar is never
+      alerted). All 27 tests across every fully-verifiable file so far
+      (RouteMatcher, PriceFetcher, TripStateMachine, AlertEngine) pass
+      together. Not yet wired into TripMonitorService - that's
+      milestone 7's job (end-to-end wiring), deliberately not pulled
+      forward into this milestone.
 - [ ] 5. `FullScreenAlertActivity` + notification channel + Android
       14+ `USE_FULL_SCREEN_INTENT` grant flow (research actual current
       behavior against developer.android.com before implementing —
