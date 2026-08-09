@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Location: fine location for route/corridor matching (PRD.md ss5.2);
+         background location because price checks must keep running while
+         the app isn't in the foreground during a drive (PRD.md ss5.1/5.2) -
+         this is a separately-granted runtime permission from API 29 (see
+         minSdk rationale in app/build.gradle.kts), requested only after
+         fine location is already granted, not bundled into one prompt. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+
+    <!-- Gates GPS/network activity to when the phone is actually being
+         driven (PRD.md ss5.1) - the whole reason this isn't just always
+         polling location. -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+
+    <!-- Runtime-requested on API 33+ for the full-screen alert's
+         notification channel (PRD.md ss5.5). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Lock-screen-visible full-screen alert (PRD.md ss5.5). On API 34+
+         this is not auto-granted to a regular app like this one - the user
+         must be sent to Settings to enable it explicitly (see milestone 5
+         in PROGRESS.md, still unbuilt as of this manifest). Declared here
+         now so the permission exists to request once that flow is built. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+
+    <!-- TripMonitorService (PRD.md ss8) runs as a foreground service with
+         the "location" type while a trip is active, per Android's
+         foreground-service-type requirement for anything doing ongoing
+         location work from a service context. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+
+    <application
+        android:name=".FuelAlertApplication"
+        android:allowBackup="true"
+        android:icon="@drawable/ic_launcher"
+        android:label="@string/app_name"
+        android:theme="@style/Theme.AppCompat.DayNight.NoActionBar"
+        android:supportsRtl="true">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:screenOrientation="portrait">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- TripMonitorService, FullScreenAlertActivity, and their manifest
+             entries land in milestones 3 and 5 (PROGRESS.md) - not declared
+             yet since they don't exist yet; a <service>/<activity> entry
+             for a class that isn't built would break the build, not just
+             look incomplete. -->
+
+    </application>
+
+</manifest>
