@@ -68,6 +68,14 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
+    // TripMonitorService.kt / TripActivityTransitionReceiver.kt -
+    // confirmed Google-Maven-only (404 on Maven Central for
+    // play-services-location before writing either file), so unlike
+    // everything above, these two source files could NOT be compiled in
+    // this sandbox - see TripMonitorService.kt's doc comment and
+    // PROGRESS.md milestone 3's note.
+    implementation("com.google.android.gms:play-services-location:21.3.0")
+
     testImplementation("junit:junit:4.13.2")
     // Local JVM unit tests run against Gradle's android.jar stub, which
     // throws "not mocked" for every android.* class it provides -

@@ -96,8 +96,44 @@ Rules for every iteration:
       genuinely compile-and-run-verified here, not just disclosed as
       unverifiable. No full `./gradlew build`/`test` has been run - that
       still needs a real network-unrestricted environment.
-- [ ] 3. `TripMonitorService` — ActivityRecognition + Location,
-      foreground service lifecycle
+- [x] 3. `TripMonitorService` — ActivityRecognition + Location,
+      foreground service lifecycle. **Done 2026-08-09.** Built:
+      `trip/TripStateMachine.kt` (pure decision logic - "is a trip
+      active," with the grace window PRD.md ss5.1 calls for, so a red
+      light doesn't end a trip), `trip/TripMonitorService.kt` (the real
+      foreground service - ActivityRecognitionClient transitions gate
+      FusedLocationProviderClient updates, delegates the actual
+      start/end decision to TripStateMachine), `trip/
+      TripActivityTransitionReceiver.kt` (the PendingIntent broadcast
+      target ActivityRecognition results arrive through), manifest
+      `<service>`/`<receiver>` entries, and a real notification channel
+      in `FuelAlertApplication.kt` for the foreground notification.
+
+      **Verified:** confirmed `com.google.android.gms:play-services-
+      location` is Google-Maven-only (404 on Maven Central) *before*
+      writing TripMonitorService.kt/TripActivityTransitionReceiver.kt,
+      same standard as every other Google-Maven-only dependency this
+      session - so the actual trip start/end DECISION logic was
+      deliberately pulled out into TripStateMachine.kt specifically so
+      it could still be genuinely compiled and run: 7 real JUnit tests,
+      including the two cases that actually matter (a brief stop within
+      the grace window does NOT end a trip; NOT_DRIVING after the grace
+      window elapses DOES) plus a fresh-DRIVING-signal-resets-the-clock
+      case and a pure-elapsed-time case with no new signal. All 19 tests
+      across every fully-verifiable file so far (RouteMatcher, PriceFetcher,
+      TripStateMachine) still pass together. `FuelAlertApplication.kt`'s
+      new notification-channel code compiles clean (core android.app
+      APIs only). `TripMonitorService.kt`/`TripActivityTransitionReceiver.kt`
+      themselves were actually attempted against the real android-all
+      jar - confirmed every resulting error traces to the disclosed
+      Play Services gap and nothing else (checked by grepping the error
+      output for anything NOT related to the missing gms classes - zero
+      matches). Still unverified: whether they compile against the real
+      Play Services APIs (needs a real Gradle build), and everything
+      about real-device behavior (does the foreground notification look
+      right, does ActivityRecognition actually fire reliably, battery
+      impact of the 30s location interval - untunable without a real
+      device).
 - [ ] 4. `AlertEngine` — threshold + debounce logic, unit tested
 - [ ] 5. `FullScreenAlertActivity` + notification channel + Android
       14+ `USE_FULL_SCREEN_INTENT` grant flow (research actual current

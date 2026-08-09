@@ -51,11 +51,25 @@
             </intent-filter>
         </activity>
 
-        <!-- TripMonitorService, FullScreenAlertActivity, and their manifest
-             entries land in milestones 3 and 5 (PROGRESS.md) - not declared
-             yet since they don't exist yet; a <service>/<activity> entry
-             for a class that isn't built would break the build, not just
-             look incomplete. -->
+        <!-- Foreground service, "location" type per FOREGROUND_SERVICE_LOCATION
+             above - PRD.md ss5.1/ss8, TripMonitorService.kt. -->
+        <service
+            android:name=".trip.TripMonitorService"
+            android:foregroundServiceType="location"
+            android:exported="false" />
+
+        <!-- Receives ActivityRecognition's IN_VEHICLE transition results,
+             delivered via PendingIntent broadcast (see
+             TripActivityTransitionReceiver.kt's doc comment for why this
+             can't just be a direct callback) - exported="false" since only
+             this app's own PendingIntent ever targets it. -->
+        <receiver
+            android:name=".trip.TripActivityTransitionReceiver"
+            android:exported="false" />
+
+        <!-- FullScreenAlertActivity and its manifest entry land in
+             milestone 5 (PROGRESS.md) - not declared yet since it doesn't
+             exist yet. -->
 
     </application>
 
