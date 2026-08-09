@@ -1,6 +1,7 @@
 package com.newfuel.fuelalert
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -8,10 +9,15 @@ import android.widget.ArrayAdapter
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.newfuel.fuelalert.alert.FullScreenIntentPermission
+import com.newfuel.fuelalert.backend.BackendResult
+import com.newfuel.fuelalert.backend.Geocoder
 import com.newfuel.fuelalert.databinding.ActivityMainBinding
 import com.newfuel.fuelalert.settings.SettingsRepository
 import com.newfuel.fuelalert.settings.ThresholdMode
+import com.newfuel.fuelalert.trip.TripMonitorService
+import kotlinx.coroutines.launch
 
 /**
  * Settings screen (PRD.md ss5.6/ss8) - every field here reads from and
@@ -28,6 +34,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var settings: SettingsRepository
+    private val geocoder = Geocoder()
 
     private val requestCoreLocationPermissions =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
@@ -44,6 +51,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
         settings = SettingsRepository(this)
 
+        setupTripControls()
         setupFuelTypeSpinner()
         setupSearchFields()
         setupThresholdControls()
@@ -54,6 +62,58 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         refreshPermissionStatus()
+    }
+
+    /** Blank destination -> near-me mode; non-blank -> geocoded first
+      * (Geocoder.kt, MainActivity's job per PRD.md ss5.3/TripMonitorService.kt's
+      * doc comment - the service itself never geocodes), then passed to
+      * TripMonitorService as already-resolved lat/lon extras. */
+    private fun setupTripControls() {
+        binding.startTripButton.setOnClickListener { startTrip() }
+        binding.stopTripButton.setOnClickListener { stopTrip() }
+        binding.tripStatusText.text = "Not monitoring"
+    }
+
+    private fun startTrip() {
+        val destinationText = binding.destinationInput.text.toString().trim()
+        if (destinationText.isEmpty()) {
+            startMonitoringService(destinationLat = null, destinationLon = null)
+            binding.tripStatusText.text = "Monitoring - near-me mode"
+            return
+        }
+
+        binding.tripStatusText.text = "Finding \"$destinationText\"…"
+        lifecycleScope.launch {
+            when (val result = geocoder.geocode(destinationText)) {
+                is BackendResult.Success -> {
+                    startMonitoringService(result.value.lat, result.value.lon)
+                    binding.tripStatusText.text = "Monitoring - route-aware to $destinationText"
+                }
+                is BackendResult.Failure -> {
+                    binding.tripStatusText.text = "Could not find \"$destinationText\": ${result.message}"
+                }
+            }
+        }
+    }
+
+    private fun startMonitoringService(destinationLat: Double?, destinationLon: Double?) {
+        val intent = Intent(this, TripMonitorService::class.java).apply {
+            action = TripMonitorService.ACTION_START_MONITORING
+            if (destinationLat != null && destinationLon != null) {
+                putExtra(TripMonitorService.EXTRA_DESTINATION_LAT, destinationLat)
+                putExtra(TripMonitorService.EXTRA_DESTINATION_LON, destinationLon)
+            }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
+        }
+    }
+
+    private fun stopTrip() {
+        stopService(Intent(this, TripMonitorService::class.java))
+        binding.tripStatusText.text = "Not monitoring"
     }
 
     private fun setupFuelTypeSpinner() {

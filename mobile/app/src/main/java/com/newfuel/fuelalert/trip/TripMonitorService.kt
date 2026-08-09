@@ -20,67 +20,106 @@ import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import com.newfuel.fuelalert.BuildConfig
 import com.newfuel.fuelalert.FuelAlertApplication
+import com.newfuel.fuelalert.alert.AlertCandidate
+import com.newfuel.fuelalert.alert.AlertEngine
+import com.newfuel.fuelalert.alert.FullScreenAlertNotifier
+import com.newfuel.fuelalert.backend.BackendResult
+import com.newfuel.fuelalert.backend.PriceFetcher
+import com.newfuel.fuelalert.backend.RouteResult
+import com.newfuel.fuelalert.backend.StationPrice
 import com.newfuel.fuelalert.route.LatLon
+import com.newfuel.fuelalert.route.RouteMatcher
+import com.newfuel.fuelalert.settings.SettingsRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /**
  * UNVERIFIED BEYOND CAREFUL REVIEW - this file could NOT be compiled in
  * this sandbox, confirmed by actually trying: com.google.android.gms.*
- * (Play Services) is published only on Google's Maven repo
- * (maven.google.com / dl.google.com), which this sandbox cannot reach -
- * a 404 from Maven Central for play-services-location confirmed this
- * before writing a line of this file, the same standard applied to
- * every other Google-Maven-only dependency this session (androidx.*,
- * media3 in ddann74/spot_block). The trip start/end DECISION logic
- * itself lives in TripStateMachine.kt instead, specifically so it could
- * be pulled out of this unverifiable file and be genuinely
- * compiled-and-run-tested (see TripStateMachineTest.kt) - this file is
- * deliberately kept as thin as possible around that verified core, but
- * "thin" isn't "zero risk"; open this in Android Studio and let Gradle
- * resolve the real Play Services APIs before trusting it compiles.
+ * (Play Services) is published only on Google's Maven repo, and
+ * BuildConfig is generated only by a real Gradle/AGP build. See
+ * mobile/PROGRESS.md milestone 3's and milestone 7's notes for exactly
+ * what was and wasn't verified.
  *
  * Foreground service (FOREGROUND_SERVICE_LOCATION type, PRD.md ss5.1/ss8)
  * that:
  * - registers for ActivityRecognition IN_VEHICLE enter/exit transitions
- *   (delivered via TripActivityTransitionReceiver, since
- *   requestActivityTransitionUpdates delivers results through a
- *   PendingIntent, not a direct in-process callback),
- * - feeds those transitions into TripStateMachine to decide whether a
- *   trip is active (grace window included, so a red light doesn't end
- *   a trip - see TripStateMachine's doc comment),
- * - starts/stops FusedLocationProviderClient location updates to match
- *   that decision - no GPS activity outside an active trip (PRD.md ss7).
+ *   (delivered via TripActivityTransitionReceiver's PendingIntent),
+ * - feeds those into TripStateMachine to decide whether a trip is
+ *   active (grace window so a red light doesn't end a trip),
+ * - starts/stops FusedLocationProviderClient updates to match that -
+ *   no GPS activity outside an active trip (PRD.md ss7),
+ * - on each location update (milestone 7 - the piece milestone 3
+ *   deliberately left as just a hook point), fetches nearby stations
+ *   and evaluates them through AlertEngine, posting a
+ *   FullScreenAlertNotifier alert for anything that clears the bar.
  *
- * Does NOT yet call into RouteMatcher/PriceFetcher/AlertEngine on each
- * location update - AlertEngine (milestone 4) doesn't exist yet, so
- * onLocationUpdate() is deliberately just the hook point for that, not
- * a stub pretending to do more than it does.
+ * **Route-aware fetch strategy - a real, disclosed simplification of
+ * PRD.md ss5.3, not the full design:** the web app samples multiple
+ * points along the route and queries each one's own radius (see
+ * static/app.js's corridor-search loop) to build full corridor
+ * coverage. This service instead does a single radius fetch centered
+ * on the driver's *current* position (radius padded to
+ * corridorWidthKm + half the lead distance, same reasoning as the web
+ * app's own fetchRadius padding), then filters through
+ * RouteMatcher.stationsAhead. This is simpler and correct for what's
+ * actually near the driver right now, but can miss a station that's
+ * on-corridor further ahead than this fetch's radius reaches even
+ * though it's still within the lead distance - a real gap versus the
+ * web app's multi-sample coverage, not one to silently pretend doesn't
+ * exist. Extending to multi-sample fetching is a legitimate follow-up,
+ * not required for this milestone's "end-to-end wiring" scope.
+ *
+ * Destination is passed in via ACTION_START_MONITORING's extras
+ * (already-geocoded lat/lon) - geocoding the free-text destination
+ * itself is MainActivity's job, not this service's (see
+ * MainActivity.kt's startTrip()).
  *
  * Assumes ACCESS_FINE_LOCATION/ACCESS_BACKGROUND_LOCATION/
  * ACTIVITY_RECOGNITION are already granted before this service starts -
- * the actual permission-request UI (with an explainer before each
- * system prompt, per PRD.md ss7) is a Settings-screen concern
- * (milestone 6), not yet built. The permission checks below are
- * defensive (avoid a SecurityException crash), not a substitute for
- * that real request flow.
+ * MainActivity's permission flow (milestone 6) is what actually
+ * requests them; the checks below are defensive, not that request flow
+ * itself.
  */
 class TripMonitorService : Service() {
 
     private lateinit var activityRecognitionClient: ActivityRecognitionClient
     private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private lateinit var settings: SettingsRepository
+    private lateinit var priceFetcher: PriceFetcher
     private var locationCallback: LocationCallback? = null
     private val tripState = TripStateMachine(GRACE_WINDOW_MILLIS)
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    /** Non-null only while a trip is active - see stopLocationUpdatesAndSelf(). */
+    private var alertEngine: AlertEngine? = null
+    private var destination: LatLon? = null
+    private var cachedRoute: RouteResult? = null
 
     override fun onCreate() {
         super.onCreate()
         activityRecognitionClient = ActivityRecognition.getClient(this)
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        settings = SettingsRepository(this)
+        priceFetcher = PriceFetcher(BuildConfig.BACKEND_BASE_URL)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForeground(NOTIFICATION_ID, buildForegroundNotification())
         when (intent?.action) {
-            ACTION_START_MONITORING -> registerActivityTransitions()
+            ACTION_START_MONITORING -> {
+                val lat = intent.getDoubleExtra(EXTRA_DESTINATION_LAT, Double.NaN)
+                val lon = intent.getDoubleExtra(EXTRA_DESTINATION_LON, Double.NaN)
+                destination = if (!lat.isNaN() && !lon.isNaN()) LatLon(lat, lon) else null
+                cachedRoute = null
+                alertEngine = AlertEngine(settings.currentThreshold())
+                registerActivityTransitions()
+            }
             ACTION_ACTIVITY_TRANSITION -> handleActivityTransition(intent)
         }
         return START_STICKY
@@ -89,6 +128,7 @@ class TripMonitorService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        serviceScope.cancel()
         stopLocationUpdates()
         if (hasPermission(android.Manifest.permission.ACTIVITY_RECOGNITION)) {
             activityRecognitionClient.removeActivityTransitionUpdates(activityTransitionPendingIntent(this))
@@ -152,13 +192,81 @@ class TripMonitorService : Service() {
 
     private fun stopLocationUpdatesAndSelf() {
         stopLocationUpdates()
+        alertEngine = null
+        destination = null
+        cachedRoute = null
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
 
-    /** Hook point for milestone 4 (AlertEngine) - not built yet, so
-      * deliberately does nothing beyond receiving the update for now. */
     private fun onLocationUpdate(position: LatLon) {
+        val engine = alertEngine ?: return
+        serviceScope.launch {
+            val dest = destination
+            val liveCandidates: List<Pair<StationPrice, Double>> = if (dest != null) {
+                fetchRouteAwareCandidates(position, dest) ?: return@launch
+            } else {
+                fetchNearMeCandidates(position) ?: return@launch
+            }
+            processCandidates(engine, liveCandidates)
+        }
+    }
+
+    /** Returns null (rather than an empty list) when the fetch itself
+      * failed, so the caller can tell "no stations right now" apart
+      * from "couldn't check" - AlertEngine.expireStationsNotIn must
+      * never be called with an empty set just because a network call
+      * failed, or it would wrongly un-mute every station mid-trip. */
+    private suspend fun fetchNearMeCandidates(position: LatLon): List<Pair<StationPrice, Double>>? {
+        val result = priceFetcher.fetchStations(position, settings.searchRadiusKm, settings.fuelType)
+        val stations = (result as? BackendResult.Success)?.value ?: return null
+        return stations.map { it to 0.0 } // near-me has no "ahead" concept - PRD.md ss5.3
+    }
+
+    private suspend fun fetchRouteAwareCandidates(position: LatLon, destination: LatLon): List<Pair<StationPrice, Double>>? {
+        var route = cachedRoute
+        if (route == null) {
+            val routeResult = priceFetcher.fetchRoute(position, destination, routeType = "fastest")
+            route = (routeResult as? BackendResult.Success)?.value ?: return null
+            cachedRoute = route
+        }
+
+        // Fetch strategy simplification - see class doc.
+        val fetchRadius = settings.corridorWidthKm + settings.leadDistanceKm / 2 + 1
+        val stationsResult = priceFetcher.fetchStations(position, fetchRadius, settings.fuelType)
+        val stations = (stationsResult as? BackendResult.Success)?.value ?: return null
+
+        val byLocation = stations.associateBy { it.location }
+        val currentProgressKm = RouteMatcher.projectOntoRoute(position, route.points).progressKm
+        val matches = RouteMatcher.stationsAhead(
+            currentPosition = position,
+            routePoints = route.points,
+            stations = stations.map { it.location },
+            corridorWidthKm = settings.corridorWidthKm,
+            leadDistanceKm = settings.leadDistanceKm,
+        )
+        return matches.mapNotNull { match ->
+            byLocation[match.station]?.let { station -> station to (match.progressKm - currentProgressKm) }
+        }
+    }
+
+    private fun processCandidates(engine: AlertEngine, candidates: List<Pair<StationPrice, Double>>) {
+        val alertCandidates = candidates.map { (station, _) -> AlertCandidate(station.code, station.pricePerLitre) }
+        engine.expireStationsNotIn(alertCandidates.map { it.stationCode }.toSet())
+        val decisions = engine.evaluate(alertCandidates)
+
+        val byCode = candidates.associateBy { it.first.code }
+        for (decision in decisions) {
+            val (station, distanceAheadKm) = byCode[decision.stationCode] ?: continue
+            FullScreenAlertNotifier.postAlert(
+                context = this,
+                stationCode = station.code,
+                stationName = station.name,
+                pricePerLitre = station.pricePerLitre,
+                distanceAheadKm = distanceAheadKm,
+                stationLocation = station.location,
+            )
+        }
     }
 
     private fun hasPermission(permission: String): Boolean =
@@ -176,6 +284,8 @@ class TripMonitorService : Service() {
     companion object {
         const val ACTION_START_MONITORING = "com.newfuel.fuelalert.action.START_MONITORING"
         const val ACTION_ACTIVITY_TRANSITION = "com.newfuel.fuelalert.action.ACTIVITY_TRANSITION"
+        const val EXTRA_DESTINATION_LAT = "destination_lat"
+        const val EXTRA_DESTINATION_LON = "destination_lon"
 
         private const val NOTIFICATION_ID = 1001
         private const val GRACE_WINDOW_MILLIS = 5 * 60 * 1000L // PRD.md ss5.1 - avoids flapping at traffic lights

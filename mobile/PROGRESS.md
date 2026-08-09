@@ -269,10 +269,77 @@ Rules for every iteration:
       both lists and diffing them — all matched exactly (one grep false
       positive from the `databinding.ActivityMainBinding` import
       string, not a real reference).
-- [ ] 7. End-to-end wiring + a written manual test plan for a real
-      device (this sandbox cannot run/emulate a real GPS trip, so this
-      milestone's own verification is necessarily a plan, not a run —
-      say so plainly when marking it done)
+- [x] 7. End-to-end wiring + a written manual test plan for a real
+      device. **Done 2026-08-09. Build phase complete.**
+
+      **Built:** `backend/Geocoder.kt` (turns the free-text destination
+      into coordinates via Nominatim — no API key needed, so unlike
+      TomTom/NSW this isn't proxied, only its usage-policy User-Agent
+      header matters). `TripMonitorService.kt`'s `onLocationUpdate()`
+      hook (deliberately left empty since milestone 3) now does the
+      real work: fetches candidate stations (near-me radius, or
+      route-aware via a cached route + `RouteMatcher.stationsAhead`),
+      runs them through `AlertEngine`, and posts a
+      `FullScreenAlertNotifier` alert for anything that clears the bar.
+      `MainActivity.kt` gained a Trip section (destination input,
+      Start/Stop, live status) wired to `Geocoder` and
+      `TripMonitorService`.
+
+      **A real, disclosed simplification, not a silent gap:**
+      route-aware mode fetches stations via a single radius search
+      centered on the driver's *current* position (padded to
+      corridorWidth + half the lead distance) rather than the web
+      app's multi-sample-point corridor scan — simpler, correct for
+      what's near the driver right now, but can miss an on-corridor
+      station further ahead than this fetch's radius reaches. Recorded
+      as a real gap in `TripMonitorService.kt`'s own doc comment, not
+      papered over — multi-sample fetching is a legitimate follow-up,
+      not required for "end-to-end wiring."
+
+      **Verified:** `Geocoder.kt` compiled AND actually run — 4 new
+      JUnit tests against a real in-JVM HTTP server (successful parse,
+      empty-result failure, malformed-response failure,
+      unreachable-server failure), all passing. All 37 tests across
+      every fully-verifiable file now pass together. The real wiring
+      logic added to `TripMonitorService.kt` was verified more directly
+      than a plain compile-check would allow: using both the
+      established fake-`R` and a new fake-`BuildConfig` scratch stub
+      (never committed — `BuildConfig` is AGP-generated, same category
+      of gap as `R`) together with the real android-all jar, every
+      resulting compile error was diffed down to its unique message and
+      confirmed to trace only to the already-disclosed Play Services
+      gap and its direct cascades — meaning the actual new business
+      logic (fetching, corridor filtering, threshold evaluation, alert
+      posting) type-checks cleanly, not just "fails for a plausible
+      reason." Same check repeated for `MainActivity.kt`'s new Trip
+      section, including confirming the one `geocode()`
+      suspend-context error is itself a downstream cascade of
+      `lifecycleScope` (androidx) failing to resolve, not an
+      independent bug. All new `binding.X` field references (5 more)
+      cross-checked against the layout's actual ids — all matched.
+
+      **Manual test plan:** `mobile/TESTING.md` — 6 numbered sections
+      (does it even build; the local mock-backend test setup; the
+      Settings/permission flow; trip start/stop; activity recognition,
+      which genuinely needs real driving or route simulation to
+      exercise; the alert itself, including the locked-screen and
+      no-permission-fallback cases) plus an explicit "known gaps this
+      plan does not cover" section (real backend data, battery impact,
+      whether the alert sound actually feels alarm-like, OS-kill/
+      restart behavior). Written as concrete steps to actually perform,
+      not a description of expected behavior — consistent with every
+      other "not verified, here's exactly what would verify it" note
+      in this file.
+
+      **What remains genuinely open going into a real build**, listed
+      here rather than left implicit: (1) the very first `./gradlew
+      assembleDebug` on a real machine — every androidx/Play-Services-
+      dependent file's compile-checkability ends at "everything else in
+      the file type-checks against a real Android API surface," not
+      "this definitely compiles" (see TESTING.md ss0); (2) backend
+      hosting for real NSW/TomTom data (PRD.md ss6, never in scope for
+      this build phase); (3) every real-device behavior TESTING.md
+      lists as unverified.
 
 ## Notes / blockers
 

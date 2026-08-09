@@ -17,6 +17,40 @@
             android:textStyle="bold"
             android:layout_marginBottom="16dp" />
 
+        <!-- Trip control -->
+        <TextView style="@style/SectionLabel" android:text="@string/section_trip_control" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/destination_hint" />
+        <EditText
+            android:id="@+id/destinationInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="text"
+            android:hint="@string/destination_placeholder" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp">
+            <Button
+                android:id="@+id/startTripButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/start_trip" />
+            <Button
+                android:id="@+id/stopTripButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/stop_trip" />
+        </LinearLayout>
+        <TextView
+            android:id="@+id/tripStatusText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="16dp" />
+
         <!-- Vehicle / fuel -->
         <TextView style="@style/SectionLabel" android:text="@string/section_fuel" />
         <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/fuel_type" />
