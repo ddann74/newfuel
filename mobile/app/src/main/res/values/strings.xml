@@ -1,8 +1,33 @@
 <resources>
     <string name="app_name">Fuel Alert</string>
-    <string name="main_placeholder">Fuel Alert scaffold - trip monitoring, route matching, and the full-screen alert land in later milestones. See mobile/PROGRESS.md.</string>
+    <string name="main_placeholder">Trip monitoring, route matching, and the full-screen alert are built (see mobile/PROGRESS.md) but not yet wired together end to end - that\'s milestone 7.</string>
     <string name="fuel_deal_headline">Fuel deal ahead</string>
     <string name="navigate_via_waze">Navigate via Waze</string>
     <string name="snooze">Snooze</string>
     <string name="dismiss">Dismiss</string>
+
+    <string name="section_fuel">Vehicle</string>
+    <string name="fuel_type">Fuel type</string>
+
+    <string name="section_search">Search</string>
+    <string name="search_radius_km">Search radius, near-me mode (km)</string>
+    <string name="corridor_width_km">Corridor width, route-aware mode (km)</string>
+    <string name="lead_distance_km">Lead distance ahead, route-aware mode (km)</string>
+
+    <string name="section_threshold">Value threshold</string>
+    <string name="target_price_mode">Target price</string>
+    <string name="percent_below_average_mode">% below average</string>
+    <string name="target_price_per_litre">Target price ($/L)</string>
+    <string name="percent_below_average">Percent below corridor/area average</string>
+
+    <string name="section_trip">Trip behavior</string>
+    <string name="trip_auto_start">Start monitoring automatically when driving is detected</string>
+
+    <string name="section_permissions">Permissions</string>
+    <string name="explain_location">Needed to find fuel prices near you and match them against your route. Only used while a trip is active.</string>
+    <string name="grant_location">Grant Location</string>
+    <string name="explain_background_location">Needed so price checks keep running while you\'re driving and the app isn\'t on screen. Requested only after Location above is granted - Android requires these as two separate steps.</string>
+    <string name="grant_background_location">Grant Background Location</string>
+    <string name="explain_full_screen_intent">Needed for the deal alert to show over your lock screen, the way an alarm does. On newer Android versions this can\'t be requested with a normal in-app prompt - tapping below opens a system settings screen instead.</string>
+    <string name="grant_full_screen_intent">Open Full-Screen Alert Settings</string>
 </resources>

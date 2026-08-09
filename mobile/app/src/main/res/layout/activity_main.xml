@@ -1,16 +1,143 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:gravity="center"
-    android:padding="24dp">
+    android:layout_height="match_parent">
 
-    <TextView
-        android:id="@+id/placeholderText"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/main_placeholder"
-        android:textAlignment="center" />
+        android:orientation="vertical"
+        android:padding="20dp">
 
-</LinearLayout>
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/app_name"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Vehicle / fuel -->
+        <TextView style="@style/SectionLabel" android:text="@string/section_fuel" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/fuel_type" />
+        <Spinner
+            android:id="@+id/fuelTypeSpinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Search settings -->
+        <TextView style="@style/SectionLabel" android:text="@string/section_search" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/search_radius_km" />
+        <EditText
+            android:id="@+id/searchRadiusInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="numberDecimal" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/corridor_width_km" />
+        <EditText
+            android:id="@+id/corridorWidthInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="numberDecimal" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/lead_distance_km" />
+        <EditText
+            android:id="@+id/leadDistanceInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="numberDecimal"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Value threshold -->
+        <TextView style="@style/SectionLabel" android:text="@string/section_threshold" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
+            <Button
+                android:id="@+id/targetPriceModeButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/target_price_mode" />
+            <Button
+                android:id="@+id/percentBelowAverageModeButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/percent_below_average_mode" />
+        </LinearLayout>
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/target_price_per_litre" />
+        <EditText
+            android:id="@+id/targetPriceInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="numberDecimal" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/percent_below_average" />
+        <EditText
+            android:id="@+id/percentBelowAverageInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="numberDecimal"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Trip behavior -->
+        <TextView style="@style/SectionLabel" android:text="@string/section_trip" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="16dp">
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/trip_auto_start" />
+            <Switch
+                android:id="@+id/tripAutoStartSwitch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+
+        <!-- Permissions -->
+        <TextView style="@style/SectionLabel" android:text="@string/section_permissions" />
+
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/explain_location" />
+        <Button
+            android:id="@+id/grantLocationButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/grant_location"
+            android:layout_marginBottom="12dp" />
+
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/explain_background_location" />
+        <Button
+            android:id="@+id/grantBackgroundLocationButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/grant_background_location"
+            android:layout_marginBottom="12dp" />
+
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/explain_full_screen_intent" />
+        <Button
+            android:id="@+id/grantFullScreenIntentButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/grant_full_screen_intent"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:id="@+id/permissionStatusText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/main_placeholder"
+            android:textSize="12sp" />
+
+    </LinearLayout>
+</ScrollView>

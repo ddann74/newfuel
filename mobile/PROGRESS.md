@@ -223,7 +223,52 @@ Rules for every iteration:
       alert actually show over a locked screen, does the 60-second
       heads-up fallback behave as documented, does the sound/vibration
       feel like an alarm rather than a routine notification).
-- [ ] 6. Settings screen
+- [x] 6. Settings screen. **Done 2026-08-09.**
+
+      **Built:** `settings/SettingsRepository.kt` — every setting
+      PRD.md ss5.6 lists (fuel type, near-me radius, route-aware
+      corridor width + lead distance, threshold mode/value, trip
+      auto-start), backed by plain SharedPreferences. `MainActivity.kt`
+      rewritten from the milestone-1 placeholder into the real Settings
+      screen: every field reads/writes straight through to
+      SettingsRepository (no separate save step), plus the permission-
+      grant flow PRD.md ss7 calls for — an explainer shown in-layout
+      before each button that triggers the real system prompt, and
+      background location requested as its own separate step only
+      after fine location is already granted (Android requires this as
+      two distinct steps, not one bundled request — already noted as a
+      manifest comment back in milestone 1, now actually implemented
+      that way). `activity_main.xml` rebuilt with real controls
+      (Spinner, EditTexts, threshold-mode toggle, Switch, permission
+      buttons + live status text).
+
+      **Verified — SettingsRepository is fully compiled AND run for
+      real, not just compile-checked:** refactored to take
+      `SharedPreferences` via an `internal` constructor specifically so
+      a test could inject a real (fake, in-memory, hand-written — not a
+      mocking framework) `SharedPreferences`/`Editor` implementation
+      rather than needing a much larger fake `Context`. 6 JUnit tests:
+      defaults match the PRD-documented values, every setting
+      round-trips, settings persist across separate repository
+      instances over the same backing store (simulating a process
+      restart), both `currentThreshold()` branches build the right
+      `ValueThreshold`, and an unrecognized stored enum value (a
+      future/incompatible app version's leftover data) falls back to
+      the default rather than crashing. All 33 tests across every
+      fully-verifiable file so far pass together.
+
+      `MainActivity.kt` itself was actually attempted against the real
+      android-all jar — confirmed (by grepping the error output down to
+      unique messages) every failure traces to the same disclosed gap
+      as milestone 1 (`androidx.appcompat`, `androidx.activity`'s
+      `ActivityResultContracts`, and the generated `ActivityMainBinding`
+      — all Google-Maven-only or generated-only) plus their direct
+      downstream cascades, nothing else. Every `binding.X` field
+      reference (12 of them) was cross-checked against
+      `activity_main.xml`'s actual `android:id` values by extracting
+      both lists and diffing them — all matched exactly (one grep false
+      positive from the `databinding.ActivityMainBinding` import
+      string, not a real reference).
 - [ ] 7. End-to-end wiring + a written manual test plan for a real
       device (this sandbox cannot run/emulate a real GPS trip, so this
       milestone's own verification is necessarily a plan, not a run —
