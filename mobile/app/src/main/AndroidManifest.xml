@@ -67,9 +67,19 @@
             android:name=".trip.TripActivityTransitionReceiver"
             android:exported="false" />
 
-        <!-- FullScreenAlertActivity and its manifest entry land in
-             milestone 5 (PROGRESS.md) - not declared yet since it doesn't
-             exist yet. -->
+        <!-- The full-screen deal alert itself (PRD.md ss5.5). Not launcher-
+             visible - only ever started via FullScreenAlertNotifier's
+             PendingIntent, either as the notification's full-screen intent
+             or by the user tapping the fallback heads-up notification.
+             excludeFromRecents so a dismissed/snoozed alert doesn't linger
+             as a stray recents entry - it's a transient alert, not a screen
+             with state worth returning to. -->
+        <activity
+            android:name=".alert.FullScreenAlertActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTop"
+            android:theme="@android:style/Theme.Material.NoActionBar" />
 
     </application>
 

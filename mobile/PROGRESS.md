@@ -161,10 +161,68 @@ Rules for every iteration:
       together. Not yet wired into TripMonitorService - that's
       milestone 7's job (end-to-end wiring), deliberately not pulled
       forward into this milestone.
-- [ ] 5. `FullScreenAlertActivity` + notification channel + Android
-      14+ `USE_FULL_SCREEN_INTENT` grant flow (research actual current
-      behavior against developer.android.com before implementing —
-      do not assume it matches an earlier Android version's rules)
+- [x] 5. `FullScreenAlertActivity` + notification channel + Android
+      14+ `USE_FULL_SCREEN_INTENT` grant flow. **Done 2026-08-09.**
+
+      **Researched before building, per this milestone's own
+      requirement — not assumed:** WebSearch against
+      developer.android.com's "Behavior changes: Apps targeting Android
+      14" page confirmed apps targeting API 34+ that aren't
+      calling/alarm apps (this one isn't) have the Play Store revoke
+      their default `USE_FULL_SCREEN_INTENT` grant at install time — it
+      is NOT auto-granted the way it was pre-14. Confirmed the two real
+      current APIs: `NotificationManager.canUseFullScreenIntent()`
+      (API 34+) to check live grant state, and
+      `Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT` (API 34+) to
+      open the settings screen to request it — verified the exact
+      `Uri.fromParts("package", context.packageName, null)` intent
+      construction via a second, independent source (a Kotlin code
+      example) rather than assuming it matches other package-scoped
+      Settings intents' shape by pattern alone. Also confirmed the
+      graceful-degradation fallback (a second WebSearch, quoting a
+      third source): without the permission, the notification still
+      shows as a heads-up notification over a locked/off screen, capped
+      at ~60 seconds, rather than being silently dropped — this is why
+      `FullScreenAlertNotifier.postAlert` calls `setFullScreenIntent`
+      unconditionally regardless of grant state, documented as
+      deliberate in its own doc comment. Sources: developer.android.com
+      "Behavior changes: Apps targeting Android 14 or higher"; a
+      Kotlin `ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT` code example
+      cross-checked against the official Settings/NotificationManager
+      references.
+
+      **Built:** `alert/FullScreenIntentPermission.kt` (grant-state
+      check + settings intent, SDK-version-gated since the check API
+      doesn't exist pre-34), `alert/FullScreenAlertNotifier.kt` (builds
+      and posts the alert notification), `alert/
+      FullScreenAlertActivity.kt` (the actual lock-screen-visible
+      screen — station name/price/distance, Navigate/Snooze/Dismiss),
+      a new `activity_full_screen_alert.xml` layout, a second
+      IMPORTANCE_HIGH/alarm-category notification channel in
+      `FuelAlertApplication.kt`, and the manifest `<activity>` entry.
+      Navigate deep-links to Waze exactly per PRD.md ss5.3's resolved
+      navigation-only decision — never a calculation source.
+
+      **Verified:** `FullScreenIntentPermission.kt` and
+      `FuelAlertApplication.kt`'s new channel code compile clean against
+      the real android-all jar — including
+      `NotificationManager.canUseFullScreenIntent()` itself, which is a
+      real, independent confirmation that the exact method name/
+      signature from research was accurate, not misremembered.
+      `FullScreenAlertActivity.kt`/`FullScreenAlertNotifier.kt` were
+      attempted against the real jar and (as expected — both use `R`,
+      generated only by a real Gradle build) failed only on unresolved
+      `R` references — confirmed by trying, then verified further with
+      a scratch-only fake `R` stub (never committed) matching the real
+      resource IDs, which let everything else in both files —
+      findViewById generics, the Notification.Builder chain,
+      AudioAttributes, Intent extras — type-check cleanly. All 27 tests
+      across every fully-verifiable file so far still pass. Not
+      verified: real compilation against the actual generated `R`
+      class or Play Services, and all real-device behavior (does the
+      alert actually show over a locked screen, does the 60-second
+      heads-up fallback behave as documented, does the sound/vibration
+      feel like an alarm rather than a routine notification).
 - [ ] 6. Settings screen
 - [ ] 7. End-to-end wiring + a written manual test plan for a real
       device (this sandbox cannot run/emulate a real GPS trip, so this

@@ -1,4 +1,8 @@
 <resources>
     <string name="app_name">Fuel Alert</string>
     <string name="main_placeholder">Fuel Alert scaffold - trip monitoring, route matching, and the full-screen alert land in later milestones. See mobile/PROGRESS.md.</string>
+    <string name="fuel_deal_headline">Fuel deal ahead</string>
+    <string name="navigate_via_waze">Navigate via Waze</string>
+    <string name="snooze">Snooze</string>
+    <string name="dismiss">Dismiss</string>
 </resources>
