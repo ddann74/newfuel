@@ -54,9 +54,48 @@ Rules for every iteration:
       which needs `dl.google.com`). No full `./gradlew assembleDebug`
       has been run - that needs a real network-unrestricted build, same
       caveat as every other Android project built this session.
-- [ ] 2. `PriceFetcher` + mock backend wiring; `RouteMatcher` ported
+- [x] 2. `PriceFetcher` + mock backend wiring; `RouteMatcher` ported
       from `static/app.js`'s corridor math, with unit tests against
-      known real coordinates
+      known real coordinates. **Done 2026-08-09.** Built:
+      `route/RouteMatcher.kt` (pure geometry, no Android dependency -
+      haversine, polyline sampling, corridor-offset projection ported
+      from `static/app.js`, plus new `projectOntoRoute`/`stationsAhead`
+      ahead-of-position logic the web app never needed) and
+      `backend/PriceFetcher.kt` (talks to the `/proxy/tomtom-route` and
+      `/proxy/nsw-stations` contract via `HttpURLConnection` + `org.json`
+      - both already part of the Android platform, deliberately not
+      OkHttp/Retrofit, so this file needed no new not-yet-verified
+      dependency). Also resolved mid-milestone: user asked to integrate
+      Waze into routing calculation - researched first (see PRD.md ss5.3
+      "Resolved 2026-08-09" note), found Waze has no public routing API
+      for an individual app, presented the tradeoff, user chose to keep
+      TomTom for calculation and Waze navigation-only, exactly matching
+      ss5.5's existing plan - PRD updated to make that explicit rather
+      than leaving it implicit.
+
+      **Verified - stronger than a compile-check, actually run:**
+      `RouteMatcherTest.kt` (9 tests) uses real Sydney coordinates
+      (Opera House/Bondi/Parramatta) with every expected distance and
+      progress value independently computed in Python beforehand, not
+      derived from running the code under test - compiled and run for
+      real on the plain JVM (zero Android dependency in RouteMatcher.kt
+      itself), all 9 pass. `PriceFetcherTest.kt` (3 tests) spins up a
+      real in-JVM HTTP server (`com.sun.net.httpserver`, standard JDK,
+      fine under `src/test` which runs on the full JDK) serving fixed
+      JSON shaped exactly like the real proxy contract, and runs
+      PriceFetcher's actual HTTP + JSON parsing code against it end to
+      end (not a mocked-out PriceFetcher) - all 3 pass, including a
+      dropped-station-with-no-price and dropped-station-with-no-location
+      case and an unreachable-backend-returns-Failure-not-a-crash case.
+      Both kotlinx-coroutines-core/-android (used by PriceFetcher) and
+      org.json (needed separately for JVM tests - Android's local unit
+      tests stub out android.jar's classes including its bundled
+      org.json, a real and easy-to-miss gotcha, now handled via
+      `testImplementation("org.json:json:...")` in `app/build.gradle.kts`)
+      are confirmed reachable on Maven Central, unlike androidx.* -
+      genuinely compile-and-run-verified here, not just disclosed as
+      unverifiable. No full `./gradlew build`/`test` has been run - that
+      still needs a real network-unrestricted environment.
 - [ ] 3. `TripMonitorService` — ActivityRecognition + Location,
       foreground service lifecycle
 - [ ] 4. `AlertEngine` — threshold + debounce logic, unit tested

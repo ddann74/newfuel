@@ -61,5 +61,21 @@ dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
 
+    // PriceFetcher (backend/PriceFetcher.kt) - both confirmed reachable
+    // on Maven Central (not Google-Maven-only, unlike androidx.*), which
+    // is how PriceFetcher.kt could actually be compile-checked this
+    // session - see mobile/PROGRESS.md milestone 2.
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
     testImplementation("junit:junit:4.13.2")
+    // Local JVM unit tests run against Gradle's android.jar stub, which
+    // throws "not mocked" for every android.* class it provides -
+    // including org.json.*, since that package ships inside android.jar
+    // even though it's really the standalone org.json library underneath.
+    // This pulls in the real implementation so tests that exercise
+    // PriceFetcher's JSON parsing (PriceFetcherTest.kt) run against real
+    // org.json code instead of throwing on first use - the standard,
+    // well-known workaround for this specific Android testing gotcha.
+    testImplementation("org.json:json:20240303")
 }
