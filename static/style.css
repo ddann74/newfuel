@@ -70,6 +70,9 @@
   .res-hdr h2{font-size:10px;font-family:'DM Mono',monospace;color:#94a3b8;letter-spacing:.08em;text-transform:uppercase}
   .res-meta{font-family:'DM Mono',monospace;font-size:10px;color:#cbd5e1}
   .filter-bar{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:.75rem;padding:.875rem 1rem;background:#fff;border:1px solid #e2e8f0;border-radius:11px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  /* route-only filters (on-route chip + max-detour slider), hidden entirely
+     when a search had no destination since "detour" has no meaning then */
+  #route-filter-group{display:flex;align-items:center;gap:7px;flex-wrap:wrap;flex:1}
   .chip{font-family:'DM Mono',monospace;font-size:10px;padding:4px 11px;border-radius:99px;border:1px solid #e2e8f0;background:transparent;color:#94a3b8;cursor:pointer;transition:all .12s}
   .chip.on{border-color:#2563eb;color:#2563eb;background:#eff6ff}
   .sep{width:1px;background:#e2e8f0;height:20px;flex-shrink:0}
@@ -99,4 +102,19 @@
   .progress-bar{height:4px;background:#e2e8f0;border-radius:99px;margin-top:.75rem;overflow:hidden;display:none}
   .progress-fill{height:100%;background:#2563eb;border-radius:99px;transition:width .3s}
   .divider{height:1px;background:#f1f5f9;margin:.875rem 0}
+  /* collapsible advanced-settings panel */
+  .adv{padding:0}
+  .adv-summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px;padding:1.25rem;user-select:none}
+  .adv-summary::-webkit-details-marker{display:none}
+  .adv-summary::after{content:'';margin-left:auto;width:7px;height:7px;border-right:1.5px solid #94a3b8;border-bottom:1.5px solid #94a3b8;transform:rotate(45deg);transition:transform .15s}
+  .adv[open] .adv-summary::after{transform:rotate(-135deg)}
+  .adv[open] .adv-summary{border-bottom:1px solid #f1f5f9}
+  .adv>*:not(.adv-summary){margin-left:1.25rem;margin-right:1.25rem}
+  .adv>.divider{margin-left:1.25rem;margin-right:1.25rem}
+  .adv>*:last-child{margin-bottom:1.25rem}
+  /* "is the drive worth it" comparison against the nearest available station */
+  .nearest-badge{font-family:'DM Mono',monospace;font-size:9px;color:#64748b;background:#f1f5f9;border-radius:4px;padding:2px 6px}
+  .worth-it{display:flex;align-items:center;gap:5px;font-family:'DM Mono',monospace;font-size:10px;margin-top:5px;padding:4px 8px;border-radius:6px;width:fit-content}
+  .worth-it.good{color:#16a34a;background:#f0fdf4;border:1px solid #bbf7d0}
+  .worth-it.bad{color:#dc2626;background:#fef2f2;border:1px solid #fecaca}
   @media(max-width:500px){.g3{grid-template-columns:1fr 1fr}.sc-meta{gap:7px}.rtab{min-width:90px}}

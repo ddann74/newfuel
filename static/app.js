@@ -107,16 +107,29 @@
   }
 
   // ── GPS ───────────────────────────────────────────────────────────────────────
+  // Returns a Promise that ALWAYS resolves once userLat/userLon are set, one
+  // way or another (real GPS, or the Sydney CBD fallback below) - never
+  // rejects, so both the header's manual "Detect Location" button and
+  // runSearch()'s own automatic call (the single-button flow doesn't
+  // require a separate manual tap first) can simply await/chain it without
+  // duplicating the same fallback handling in two places.
   function detectLocation(){
     document.getElementById('loc-btn-txt').textContent='Locating…';
-    if(!navigator.geolocation){showErr('Geolocation not supported.');return;}
-    navigator.geolocation.getCurrentPosition(
-      pos=>{userLat=pos.coords.latitude;userLon=pos.coords.longitude;
-        document.getElementById('loc-btn-txt').textContent=`${userLat.toFixed(4)}, ${userLon.toFixed(4)}`;
-        document.getElementById('loc-label').textContent='📍 GPS location active';},
-      ()=>{document.getElementById('loc-btn-txt').textContent='Location denied';
-        showWarn('Location access denied — using Sydney CBD.');userLat=-33.8688;userLon=151.2093;}
-    );
+    return new Promise(resolve=>{
+      if(!navigator.geolocation){
+        showErr('Geolocation not supported — using Sydney CBD.');
+        userLat=-33.8688;userLon=151.2093;resolve();return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        pos=>{userLat=pos.coords.latitude;userLon=pos.coords.longitude;
+          document.getElementById('loc-btn-txt').textContent=`${userLat.toFixed(4)}, ${userLon.toFixed(4)}`;
+          document.getElementById('loc-label').textContent='📍 GPS location active';
+          resolve();},
+        ()=>{document.getElementById('loc-btn-txt').textContent='Location denied';
+          showWarn('Location access denied — using Sydney CBD.');
+          userLat=-33.8688;userLon=151.2093;resolve();}
+      );
+    });
   }
 
   // ── UI state ──────────────────────────────────────────────────────────────────
@@ -230,37 +243,57 @@
     }
     activeRouteType=rt;
     renderRouteTabs(rt);
-    renderStationList(cache[rt].results, cache[rt].baseDist, rt);
+    renderStationList(cache[rt].results, cache[rt].baseDist, rt, true);
   }
 
   // ── Render station list ───────────────────────────────────────────────────────
-  function renderStationList(rawResults, baseDist, rt){
+  // hasDest: false when the driver searched with no destination set (Near Me
+  // only) - hides destination/route-specific fields (to-dest distance,
+  // detour badge, corridor badge) that have no meaning without a route.
+  function renderStationList(rawResults, baseDist, rt, hasDest){
     const sorted=sortResults(rawResults);
     const worst=sorted[sorted.length-1]?.total||0;
     sorted.forEach(r=>r.savings=worst-r.total);
 
     const list=document.getElementById('station-list');
     list.innerHTML='';
-    document.getElementById('res-meta').textContent=
-      `${sorted.length} stations · ${baseDist.toFixed(1)} km direct · ${priority==='route'?'prioritising route':'prioritising savings'}`;
+    document.getElementById('res-meta').textContent=hasDest
+      ?`${sorted.length} stations · ${baseDist.toFixed(1)} km direct · ${priority==='route'?'prioritising route':'prioritising savings'}`
+      :`${sorted.length} stations near you`;
 
     sorted.forEach((s,i)=>{
       const el=document.createElement('div');
       el.className='scard'+(i===0?' best':'');
       el.dataset.detour=s.detour;
+      // Driver-requested: is driving further than the nearest option actually
+      // worth it once the extra fuel burned getting there is accounted for?
+      // netVsNearest = (nearest station's own real total) - (this station's
+      // real total) - positive means genuinely cheaper overall, not just a
+      // lower per-litre price. Omitted for the nearest station itself
+      // (comparing it to itself is meaningless) and when no baseline could
+      // be computed at all (e.g. only one station found).
+      let worthItHtml='';
+      if(s.isNearest){
+        worthItHtml='<div class="worth-it good"><i class="ti ti-map-pin"></i> This is your nearest option</div>';
+      }else if(s.netVsNearest!=null){
+        worthItHtml=s.netVsNearest>0
+          ?`<div class="worth-it good"><i class="ti ti-check"></i> Worth it — net save $${s.netVsNearest.toFixed(2)} vs nearest, after the extra drive</div>`
+          :`<div class="worth-it bad"><i class="ti ti-alert-triangle"></i> Not worth it — costs $${Math.abs(s.netVsNearest).toFixed(2)} more than the nearest option once the extra drive is included</div>`;
+      }
       el.innerHTML=`
         <div>
           <div class="sc-top">
-            <span>${routeBadge(s.detour)}</span>
+            ${hasDest?`<span>${routeBadge(s.detour)}</span>`:''}
             <span class="sc-name">${s.name}</span>
             <span class="bbadge">${s.brand}</span>
             ${s.corridorKm!=null?`<span class="corridor-badge">${s.corridorKm.toFixed(1)} km off route</span>`:''}
           </div>
           <div class="sc-meta">
-            <span><i class="ti ti-map-pin"></i> ${s.toStation.toFixed(1)} km from start</span>
-            <span><i class="ti ti-flag"></i> ${s.toDest.toFixed(1)} km to dest</span>
-            <span><i class="ti ti-arrows-right-left"></i> +${s.detour.toFixed(1)} km detour</span>
+            <span><i class="ti ti-map-pin"></i> ${s.toStation.toFixed(1)} km ${hasDest?'from start':'away'}</span>
+            ${hasDest?`<span><i class="ti ti-flag"></i> ${s.toDest.toFixed(1)} km to dest</span>
+            <span><i class="ti ti-arrows-right-left"></i> +${s.detour.toFixed(1)} km detour</span>`:''}
           </div>
+          ${worthItHtml}
           <a class="nav-link" href="https://waze.com/ul?ll=${s.lat},${s.lon}&navigate=yes" target="_blank">
             <i class="ti ti-navigation"></i> Navigate via Waze
           </a>
@@ -269,8 +302,8 @@
           <div class="p-eff">$${s.price.toFixed(3)}</div>
           <div class="p-sub">per litre</div>
           <div class="p-total">${s.spendLiters!=null?s.spendLiters.toFixed(1)+' L · ':''}$${s.fillCost.toFixed(2)} to fill</div>
-          <div class="p-total">$${s.total.toFixed(2)} trip total</div>
-          ${i===0?`<div class="p-best">Best value</div>`:`<div class="p-save">save $${s.savings.toFixed(2)}</div>`}
+          <div class="p-total">$${s.total.toFixed(2)} ${hasDest?'trip total':'total incl. drive'}</div>
+          ${i===0?`<div class="p-best">Best value</div>`:''}
         </div>`;
       list.appendChild(el);
     });
@@ -278,25 +311,42 @@
     document.getElementById('results-section').scrollIntoView({behavior:'smooth',block:'start'});
   }
 
-  function renderResults(results, baseDist, routeKm, routeMins, rt){
-    // Cache this route's results
-    cache[rt]={results, baseDist, routeKm, routeMins};
-    activeRouteType=rt;
+  function renderResults(results, baseDist, routeKm, routeMins, rt, hasDest){
     document.getElementById('results-section').style.display='block';
-    renderRouteTabs(rt);
-    renderStationList(results, baseDist, rt);
+    document.getElementById('res-title').textContent=hasDest?'Route Comparison':'Nearby Stations';
+    document.getElementById('route-tabs').style.display=hasDest?'flex':'none';
+    document.getElementById('route-filter-group').style.display=hasDest?'flex':'none';
+    if(!hasDest&&filterMode==='route')setFilter('all');
+    if(hasDest){
+      // Cache this route's results - only meaningful when comparing
+      // fastest/shortest/eco for an actual route to a destination.
+      cache[rt]={results, baseDist, routeKm, routeMins};
+      activeRouteType=rt;
+      renderRouteTabs(rt);
+    }
+    renderStationList(results, baseDist, rt, hasDest);
   }
 
   // ── Core search for one route type ───────────────────────────────────────────
+  const CTA_LABEL='<i class="ti ti-bolt"></i> Find Best Deal';
+
   async function runSearch(){
     clearMessages();
     const dest=document.getElementById('dest').value.trim();
-    if(!dest){showErr('Please enter a destination.');return;}
-    if(!userLat){userLat=-33.8688;userLon=151.2093;showWarn('No GPS — using Sydney CBD. Click Detect Location for accuracy.');}
+    const hasDest=dest.length>0;
 
     const btn=document.getElementById('cta-btn');
     btn.disabled=true;
     setProgress(5);
+
+    // Single-button flow: get a location fix automatically rather than
+    // requiring a separate manual "Detect Location" tap first.
+    // detectLocation() always resolves (falls back to Sydney CBD + a
+    // warning on denial/no support), so this never blocks the search.
+    if(!userLat){
+      setBtn('<span class="spinner"></span> Getting your location…');
+      await detectLocation();
+    }
 
     const economy  =parseFloat(document.getElementById('economy').value)||8.5;
     const tank     =parseFloat(document.getElementById('tank').value)||60;
@@ -307,37 +357,48 @@
     // liters is used as fallback (auto); when spendAmt>0, per-station litres computed below
     const autoLiters=+(tank*(1-gaugePct/100)).toFixed(1);
     const rt       =routeType;
+    // Corridor search needs an actual route to sample along - with no
+    // destination there's nothing to build a corridor around, so this run
+    // always behaves as Near Me regardless of the stored Advanced Settings
+    // toggle (which stays as the driver left it for next time they do
+    // enter a destination).
+    const effectiveMode=hasDest?searchMode:'near';
 
     try{
-      setBtn('<span class="spinner"></span> Geocoding destination…');
-      const[dLat,dLon]=await geocode(dest);
-      setProgress(12);
+      let dLat=null,dLon=null,routeData=null;
+
+      if(hasDest){
+        setBtn('<span class="spinner"></span> Geocoding destination…');
+        try{[dLat,dLon]=await geocode(dest);}
+        catch(e){showErr(e.message);btn.disabled=false;setBtn(CTA_LABEL);setProgress(0);return;}
+        setProgress(12);
+      }
 
       setBtn('<span class="spinner"></span> Authenticating with NSW FuelCheck…');
       let token;
       try{token=await getNSWToken();}
       catch(e){
         showErr('NSW FuelCheck API error: '+e.message+'<br><br>CORS restriction — run via local server or Streamlit proxy.');
-        btn.disabled=false;setBtn('<i class="ti ti-bolt"></i> Find Best Station · Ranked by Savings');setProgress(0);return;
+        btn.disabled=false;setBtn(CTA_LABEL);setProgress(0);return;
       }
       setProgress(20);
 
-      // Fetch route polyline (always needed for distance calc)
-      setBtn(`<span class="spinner"></span> Fetching ${routeLabels[rt]} route…`);
-      let routeData;
-      try{routeData=await tomtomRoute(userLat,userLon,dLat,dLon,rt);}
-      catch(e){showErr('TomTom: '+e.message);btn.disabled=false;setBtn('<i class="ti ti-bolt"></i> Find Best Station · Ranked by Savings');setProgress(0);return;}
-      setProgress(30);
+      if(hasDest){
+        setBtn(`<span class="spinner"></span> Fetching ${routeLabels[rt]} route…`);
+        try{routeData=await tomtomRoute(userLat,userLon,dLat,dLon,rt);}
+        catch(e){showErr('TomTom: '+e.message);btn.disabled=false;setBtn(CTA_LABEL);setProgress(0);return;}
+        setProgress(30);
+      }
 
       let rawStations=[];
 
-      if(searchMode==='near'){
+      if(effectiveMode==='near'){
         const radius=parseInt(document.getElementById('radius').value)||10;
         setBtn(`<span class="spinner"></span> Fetching ${fuelType} prices within ${radius} km…`);
         try{
           const raw=await fetchStations(userLat,userLon,radius,fuelType,token);
           rawStations=parseStations(raw);
-        }catch(e){showErr('NSW FuelCheck: '+e.message);btn.disabled=false;setBtn('<i class="ti ti-bolt"></i> Find Best Station · Ranked by Savings');setProgress(0);return;}
+        }catch(e){showErr('NSW FuelCheck: '+e.message);btn.disabled=false;setBtn(CTA_LABEL);setProgress(0);return;}
         setProgress(55);
 
       }else{
@@ -374,12 +435,14 @@
       }
 
       if(!rawStations.length){
-        showWarn('No stations found. Try increasing the search radius / corridor width.');
-        btn.disabled=false;setBtn('<i class="ti ti-bolt"></i> Find Best Station · Ranked by Savings');setProgress(0);return;
+        showWarn(hasDest
+          ?'No stations found. Try increasing the search radius / corridor width in Advanced Settings.'
+          :'No stations found nearby. Try increasing the search radius in Advanced Settings.');
+        btn.disabled=false;setBtn(CTA_LABEL);setProgress(0);return;
       }
 
       setBtn('<span class="spinner"></span> Calculating road distances…');
-      const baseDist=routeData.distKm;
+      const baseDist=hasDest?routeData.distKm:0;
       // In corridor mode, rawStations is built by concatenating per-sample-point
       // batches in route order, not price order - each batch is individually
       // price-sorted by the API, but the combined list isn't. Sorting by price here,
@@ -388,29 +451,56 @@
       // find them first.
       rawStations.sort((a,b)=>a.price-b.price);
       const cap=Math.min(rawStations.length,25);
-      const results=[];
 
-      for(let i=0;i<cap;i++){
+      // "Is the drive worth it?" (driver-requested): find the single
+      // geographically NEAREST candidate (cheap straight-line distance, no
+      // API call) as the "what if I just went to my closest option, price
+      // be damned" baseline. It might not be among the cheapest-by-price
+      // stations actually priced below, so it's given a guaranteed extra
+      // slot here rather than only being considered if it happens to also
+      // be cheap. Its own total is computed via the exact same real-driving-
+      // distance cost math as every other candidate below, just possibly as
+      // one extra (26th) priced station - straight-line distance only
+      // decides WHICH station is "nearest," never its actual cost.
+      let nearestIdx=-1,nearestD=Infinity;
+      rawStations.forEach((s,i)=>{
+        const d=haversineRaw(userLat,userLon,s.lat,s.lon);
+        if(d<nearestD){nearestD=d;nearestIdx=i;}
+      });
+      const priceIdxs=Array.from({length:cap},(_,i)=>i);
+      if(nearestIdx>=cap)priceIdxs.push(nearestIdx);
+
+      const results=[];
+      let nearestTotal=null;
+
+      for(let n=0;n<priceIdxs.length;n++){
+        const i=priceIdxs[n];
         const s=rawStations[i];
-        setProgress(65+Math.round((i/cap)*30));
+        setProgress(65+Math.round((n/priceIdxs.length)*30));
         const legA=await tomtomDist(userLat,userLon,s.lat,s.lon);
-        const legB=await tomtomDist(s.lat,s.lon,dLat,dLon);
-        const detour=Math.max(0,(legA+legB)-baseDist);
+        const legB=hasDest?await tomtomDist(s.lat,s.lon,dLat,dLon):0;
+        const detour=hasDest?Math.max(0,(legA+legB)-baseDist):0;
         const liters=spendAmt>0?spendAmt/s.price:autoLiters;
         const fillCost=spendAmt>0?spendAmt:liters*s.price;
         const legACost=(legA*economy/100)*s.price;
-        const legBCost=(legB*tripMult*economy/100)*s.price;
+        const legBCost=hasDest?(legB*tripMult*economy/100)*s.price:0;
         const total=fillCost+legACost+legBCost;
-        results.push({...s,toStation:legA,toDest:legB,detour,fillCost,total,savings:0,corridorKm:s.corridorKm??null,spendLiters:spendAmt>0?liters:null});
+        const isNearest=(i===nearestIdx);
+        if(isNearest)nearestTotal=total;
+        results.push({...s,toStation:legA,toDest:hasDest?legB:null,detour,fillCost,total,
+          isNearest,corridorKm:s.corridorKm??null,spendLiters:spendAmt>0?liters:null});
+      }
+      if(nearestTotal!=null){
+        results.forEach(r=>{r.netVsNearest=r.isNearest?0:(nearestTotal-r.total);});
       }
 
       setProgress(100);
-      renderResults(results,baseDist,routeData.distKm,routeData.mins,rt);
+      renderResults(results,baseDist,hasDest?routeData.distKm:null,hasDest?routeData.mins:null,rt,hasDest);
 
     }catch(e){showErr(e.message);}
 
     btn.disabled=false;
-    setBtn('<i class="ti ti-bolt"></i> Find Best Station · Ranked by Savings');
+    setBtn(CTA_LABEL);
     setProgress(0);
   }
 
