@@ -9,6 +9,17 @@
   const cache={};
   let activeRouteType='fastest';
 
+  // ── HTML escaping ─────────────────────────────────────────────────────────────
+  // Station name/brand (NSW FuelCheck) and place names (Nominatim) are both
+  // external, untrusted data - neither API guarantees its text is free of
+  // HTML-significant characters (a station or POI name could legitimately
+  // contain a stray "<" or "&", or a crafted one could contain a full tag).
+  // Both are interpolated directly into innerHTML elsewhere in this file, so
+  // escape them first rather than trusting the source.
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
   // ── Math helpers ──────────────────────────────────────────────────────────────
   function haversineRaw(lat1,lon1,lat2,lon2){
     const R=6371,dLat=(lat2-lat1)*Math.PI/180,dLon=(lon2-lon1)*Math.PI/180;
@@ -34,14 +45,23 @@
     return{distKm,mins,points};
   }
 
+  // Returns {km, estimated} rather than a bare number - estimated:true means
+  // the TomTom call failed (network error, timeout, or non-OK response,
+  // including a rate limit) and this is the haversine*1.28 straight-line
+  // fallback, not a real routed distance. Up to 26 of these calls fire per
+  // search with no throttling between them, so hitting TomTom's rate limit
+  // mid-search is a real possibility, not just a hypothetical network blip -
+  // callers need to know which figure they got so a station's total isn't
+  // silently costed on a rougher basis than its neighbours with no
+  // indication to the driver.
   async function tomtomDist(olat,olon,dlat,dlon){
     try{
       const url=`https://api.tomtom.com/routing/1/calculateRoute/${olat},${olon}:${dlat},${dlon}/json?key=${TOMTOM_KEY}&travelMode=car&routeType=fastest`;
       const r=await fetch(url,{signal:AbortSignal.timeout(8000)});
       if(!r.ok) throw new Error();
       const d=await r.json();
-      return d.routes[0].summary.lengthInMeters/1000;
-    }catch{return haversine(olat,olon,dlat,dlon);}
+      return {km:d.routes[0].summary.lengthInMeters/1000,estimated:false};
+    }catch{return {km:haversine(olat,olon,dlat,dlon),estimated:true};}
   }
 
   // ── Polyline helpers ──────────────────────────────────────────────────────────
@@ -284,9 +304,10 @@
         <div>
           <div class="sc-top">
             ${hasDest?`<span>${routeBadge(s.detour)}</span>`:''}
-            <span class="sc-name">${s.name}</span>
-            <span class="bbadge">${s.brand}</span>
+            <span class="sc-name">${escapeHtml(s.name)}</span>
+            <span class="bbadge">${escapeHtml(s.brand)}</span>
             ${s.corridorKm!=null?`<span class="corridor-badge">${s.corridorKm.toFixed(1)} km off route</span>`:''}
+            ${s.estimated?`<span class="est-badge" title="TomTom routing was unavailable for this station (timeout, error, or rate limit) - distance and cost use a straight-line estimate instead of a real route">~ est.</span>`:''}
           </div>
           <div class="sc-meta">
             <span><i class="ti ti-map-pin"></i> ${s.toStation.toFixed(1)} km ${hasDest?'from start':'away'}</span>
@@ -477,8 +498,15 @@
         const i=priceIdxs[n];
         const s=rawStations[i];
         setProgress(65+Math.round((n/priceIdxs.length)*30));
-        const legA=await tomtomDist(userLat,userLon,s.lat,s.lon);
-        const legB=hasDest?await tomtomDist(s.lat,s.lon,dLat,dLon):0;
+        const legAResult=await tomtomDist(userLat,userLon,s.lat,s.lon);
+        const legBResult=hasDest?await tomtomDist(s.lat,s.lon,dLat,dLon):{km:0,estimated:false};
+        const legA=legAResult.km,legB=legBResult.km;
+        // Surfaced to the driver (see the "est." badge in renderStationList)
+        // rather than left silent - a station whose cost rests on a rough
+        // haversine*1.28 guess instead of a real routed distance shouldn't
+        // look exactly as certain as one that isn't, especially since this
+        // can flip which option looks "best".
+        const estimated=legAResult.estimated||legBResult.estimated;
         const detour=hasDest?Math.max(0,(legA+legB)-baseDist):0;
         const liters=spendAmt>0?spendAmt/s.price:autoLiters;
         const fillCost=spendAmt>0?spendAmt:liters*s.price;
@@ -487,7 +515,7 @@
         const total=fillCost+legACost+legBCost;
         const isNearest=(i===nearestIdx);
         if(isNearest)nearestTotal=total;
-        results.push({...s,toStation:legA,toDest:hasDest?legB:null,detour,fillCost,total,
+        results.push({...s,toStation:legA,toDest:hasDest?legB:null,detour,fillCost,total,estimated,
           isNearest,corridorKm:s.corridorKm??null,spendLiters:spendAmt>0?liters:null});
       }
       if(nearestTotal!=null){
@@ -522,7 +550,7 @@
     const list=document.getElementById('ac-list');
     if(!acResults.length){closeAc();return;}
     acIndex=-1;
-    list.innerHTML=acResults.map((r,i)=>`<div class="ac-item" onmousedown="pickAc(${i})">${r}</div>`).join('');
+    list.innerHTML=acResults.map((r,i)=>`<div class="ac-item" onmousedown="pickAc(${i})">${escapeHtml(r)}</div>`).join('');
     list.classList.add('open');
   }
   function pickAc(i){document.getElementById('dest').value=acResults[i];closeAc();}
