@@ -1,0 +1,5 @@
+// Top-level build file - no project-wide config needed beyond declaring
+// the Android Gradle Plugin version once here so :app doesn't have to.
+plugins {
+    id 'com.android.application' version '8.5.2' apply false
+}

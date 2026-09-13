@@ -1,0 +1,5 @@
+<resources>
+    <!-- Matches the web app's own accent (.hico/.cta background in style.css) -->
+    <color name="brand_blue">#2563EB</color>
+    <color name="white">#FFFFFF</color>
+</resources>

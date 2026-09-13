@@ -1,0 +1,64 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.newfuel.app'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.newfuel.app"
+        // 26 (Android 8.0) specifically so the adaptive icon (mipmap-anydpi-v26)
+        // is the only icon format needed - no separate legacy pre-adaptive-icon
+        // PNG set to maintain for the narrow API 24-25 slice.
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    // WebViewAssetLoader - serves the bundled static/ site over a real
+    // https:// origin (https://appassets.androidplatform.net/...) instead
+    // of file:///android_asset/... . This matters here specifically: the
+    // web app's own existing code (see runSearch()'s NSW auth error
+    // handling in app.js) already anticipates a CORS failure when this
+    // app isn't loaded from a real http(s) origin. A raw file:// load
+    // sends Origin: null on every fetch(), which most permissive
+    // (Access-Control-Allow-Origin: *) CORS policies do NOT reliably
+    // treat the same as a real origin - WebViewAssetLoader is Google's
+    // own documented fix for exactly this class of problem. NOT verified
+    // against the live NSW FuelCheck API from this environment (no
+    // Android device/network access to that specific host here) - see
+    // MainActivity's own comment and the module README.
+    implementation 'androidx.webkit:webkit:1.12.1'
+}
+
+// Keeps the bundled copy of the web app's own CSS/JS in sync with the
+// canonical source under static/ (the same files app.py's Streamlit path
+// serves) - so a future fix to static/app.js reaches this Android build
+// automatically on the next Gradle build, rather than needing a manual
+// re-copy step that's easy to forget and silently drift out of date.
+tasks.register('syncWebAssets', Copy) {
+    from("${rootDir}/../static") {
+        include 'style.css', 'app.js'
+    }
+    into "${projectDir}/src/main/assets"
+}
+tasks.named('preBuild').configure {
+    dependsOn 'syncWebAssets'
+}

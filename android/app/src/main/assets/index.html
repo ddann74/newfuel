@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fuel Optimizer</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.7.0/tabler-icons.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="hico">⛽</div>
+    <div>
+      <h1>Fuel Optimizer</h1>
+      <p id="loc-label">NSW FuelCheck · TomTom Routing</p>
+    </div>
+    <button class="loc-btn" id="loc-btn" onclick="detectLocation()">
+      <i class="ti ti-current-location"></i>
+      <span id="loc-btn-txt">Detect Location</span>
+    </button>
+  </div>
+
+  <!-- Simple, single-button search -->
+  <div class="card">
+    <div class="sec-label">Destination <span style="color:#cbd5e1;font-size:9px;margin-left:4px">optional</span></div>
+    <div class="dest-wrap">
+      <input class="dest-inp" type="text" id="dest" placeholder="Leave blank to just search near you, or enter e.g. Mt Annan, Airds, Sydney Airport…" autocomplete="off" oninput="onDestInput()" onkeydown="onDestKey(event)">
+      <div class="autocomplete-list" id="ac-list"></div>
+    </div>
+
+    <button class="cta" id="cta-btn" onclick="runSearch()">
+      <i class="ti ti-bolt"></i> Find Best Deal
+    </button>
+    <div class="progress-bar" id="prog-bar">
+      <div class="progress-fill" id="prog-fill" style="width:0%"></div>
+    </div>
+  </div>
+
+  <!-- Advanced settings - collapsed by default, sensible defaults used otherwise -->
+  <details class="card adv">
+    <summary class="sec-label adv-summary"><i class="ti ti-adjustments"></i> Advanced Settings</summary>
+
+    <div class="sec-label" style="margin-top:1rem">Vehicle & Trip</div>
+    <div class="g2" style="margin-bottom:.875rem">
+      <div class="field">
+        <label>Fuel Economy (L/100km)</label>
+        <input type="number" id="economy" value="8.5" step="0.5" min="1" max="30" oninput="updateSummary()">
+      </div>
+      <div class="field">
+        <label>Tank Capacity (L)</label>
+        <input type="number" id="tank" value="60" step="5" min="10" max="200" oninput="updateSummary()">
+      </div>
+    </div>
+    <div class="g3" style="margin-bottom:.875rem">
+      <div class="field">
+        <label>Fuel Type</label>
+        <select id="fueltype" onchange="updateSummary()">
+          <option>E10</option><option>U91</option><option>U95</option>
+          <option>U98</option><option>P98</option><option>Diesel</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Trip Mode</label>
+        <div class="tog-row">
+          <button class="tog on" id="tog-one" onclick="setTrip('one')">One Way</button>
+          <button class="tog" id="tog-ret" onclick="setTrip('return')">Return</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>I want to spend ($, 0=auto)</label>
+        <input type="number" id="manual-spend" value="0" step="5" min="0" max="500" oninput="updateSummary()">
+      </div>
+    </div>
+    <div class="gauge-wrap">
+      <div class="gauge-top">
+        <label>Current Tank Level</label>
+        <span class="gauge-val" id="gauge-label">25%</span>
+      </div>
+      <input type="range" min="0" max="100" step="5" value="25" id="gauge" style="width:100%;accent-color:#2563eb" oninput="updateGauge()">
+      <div class="gauge-track"><div class="gauge-fill" id="gauge-fill" style="width:25%"></div></div>
+      <div class="gauge-lbls"><span>Empty</span><span>Half</span><span>Full</span></div>
+    </div>
+    <div class="sum-pill">
+      <i class="ti ti-droplet"></i>
+      Will fill <strong style="color:#1e40af;margin:0 3px" id="fill-l">45.0 L</strong> of <span id="fill-ft">E10</span>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="sec-label">Search Mode <span style="color:#cbd5e1;font-size:9px;margin-left:4px">only applies with a destination set</span></div>
+    <div class="seg" id="seg-search">
+      <button class="seg-btn on" id="mode-near" onclick="setMode('near')"><i class="ti ti-map-pin"></i> Near Me</button>
+      <button class="seg-btn" id="mode-corridor" onclick="setMode('corridor')"><i class="ti ti-route"></i> Along Route</button>
+    </div>
+
+    <!-- Near Me radius -->
+    <div id="near-opts">
+      <div class="field">
+        <label>Search Radius around me</label>
+        <div style="display:flex;align-items:center;gap:7px;margin-top:4px">
+          <input type="range" min="5" max="50" step="5" value="10" id="radius" style="flex:1;accent-color:#2563eb" oninput="document.getElementById('rad-val').textContent=this.value+'km'">
+          <span style="font-family:'DM Mono',monospace;font-size:11px;color:#2563eb;min-width:32px;font-weight:500" id="rad-val">10km</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Along Route corridor options -->
+    <div class="corridor-opts" id="corridor-opts">
+      <div class="g2">
+        <div class="field">
+          <label>Corridor Width (km off route)</label>
+          <div style="display:flex;align-items:center;gap:7px;margin-top:4px">
+            <input type="range" min="1" max="15" step="1" value="5" id="corridor-width" style="flex:1;accent-color:#2563eb" oninput="document.getElementById('cw-val').textContent=this.value+'km'">
+            <span style="font-family:'DM Mono',monospace;font-size:11px;color:#2563eb;min-width:32px;font-weight:500" id="cw-val">5km</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Sample every (km along route)</label>
+          <div style="display:flex;align-items:center;gap:7px;margin-top:4px">
+            <input type="range" min="5" max="30" step="5" value="10" id="sample-km" style="flex:1;accent-color:#2563eb" oninput="document.getElementById('sk-val').textContent=this.value+'km'">
+            <span style="font-family:'DM Mono',monospace;font-size:11px;color:#2563eb;min-width:32px;font-weight:500" id="sk-val">10km</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Route Type -->
+    <div class="sec-label">Route Type <span style="color:#cbd5e1;font-size:9px;margin-left:4px">search all 3 to compare, needs a destination</span></div>
+    <div class="seg">
+      <button class="seg-btn on" id="rt-fastest" onclick="setRouteType('fastest')">⚡ Fastest</button>
+      <button class="seg-btn" id="rt-shortest" onclick="setRouteType('shortest')">📏 Shortest</button>
+      <button class="seg-btn" id="rt-eco" onclick="setRouteType('eco')">🌿 Eco</button>
+    </div>
+
+    <!-- Prioritise -->
+    <div class="sec-label">Prioritise</div>
+    <div class="seg">
+      <button class="seg-btn on" id="pri-savings" onclick="setPriority('savings')">💰 Max Savings</button>
+      <button class="seg-btn" id="pri-route" onclick="setPriority('route')">🛣 Stay on Route</button>
+    </div>
+  </details>
+
+  <div id="error-box" style="display:none" class="err-box"></div>
+  <div id="warn-box" style="display:none" class="warn-box"></div>
+
+  <!-- Results -->
+  <div id="results-section" style="display:none">
+    <div class="res-hdr">
+      <h2 id="res-title">Results</h2>
+      <span class="res-meta" id="res-meta"></span>
+    </div>
+
+    <!-- Route tabs -->
+    <div class="route-tabs" id="route-tabs"></div>
+
+    <div class="filter-bar">
+      <button class="chip on" id="chip-all" onclick="setFilter('all')">All</button>
+      <span id="route-filter-group">
+        <button class="chip" id="chip-rt" onclick="setFilter('route')">
+          <i class="ti ti-route"></i> On-Route ≤3km
+        </button>
+        <div class="sep" style="display:inline-block"></div>
+        <span class="rng-wrap">
+          <label>Max detour</label>
+          <input type="range" min="0" max="20" step="1" value="20" id="detour-f" oninput="applyFilters()">
+          <span class="rng-val" id="detour-v">any</span>
+        </span>
+      </span>
+    </div>
+    <div id="station-list"></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
