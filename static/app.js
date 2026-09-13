@@ -9,6 +9,66 @@
   const cache={};
   let activeRouteType='fastest';
 
+  // ── Remember Advanced Settings across visits ─────────────────────────────────
+  // Driver-requested: shouldn't have to re-enter fuel economy/tank size/fuel
+  // type/radius etc. every single time - previously these silently reset to
+  // their hardcoded HTML defaults on every fresh page load, with nothing
+  // saved anywhere. Saved to localStorage (this page has no backend of its
+  // own to persist to) at the moment a search is actually run, not on every
+  // keystroke - simplest approach that still means "configure once, it
+  // sticks from then on."
+  const SETTINGS_KEY='fuelOptimizerSettings';
+
+  function saveSettings(){
+    try{
+      localStorage.setItem(SETTINGS_KEY,JSON.stringify({
+        economy:document.getElementById('economy').value,
+        tank:document.getElementById('tank').value,
+        gauge:document.getElementById('gauge').value,
+        manualSpend:document.getElementById('manual-spend').value,
+        fuelType:document.getElementById('fueltype').value,
+        radius:document.getElementById('radius').value,
+        corridorWidth:document.getElementById('corridor-width').value,
+        sampleKm:document.getElementById('sample-km').value,
+        tripMode,searchMode,routeType,priority
+      }));
+    }catch{} // localStorage can throw (private browsing, storage disabled) - never worth blocking a search over
+  }
+
+  function loadSettings(){
+    let saved;
+    try{saved=JSON.parse(localStorage.getItem(SETTINGS_KEY));}catch{return;}
+    if(!saved)return;
+    if(saved.economy!=null)document.getElementById('economy').value=saved.economy;
+    if(saved.tank!=null)document.getElementById('tank').value=saved.tank;
+    if(saved.gauge!=null){
+      document.getElementById('gauge').value=saved.gauge;
+      document.getElementById('gauge-fill').style.width=saved.gauge+'%';
+      document.getElementById('gauge-label').textContent=saved.gauge+'%';
+    }
+    if(saved.manualSpend!=null)document.getElementById('manual-spend').value=saved.manualSpend;
+    if(saved.fuelType!=null)document.getElementById('fueltype').value=saved.fuelType;
+    if(saved.radius!=null){
+      document.getElementById('radius').value=saved.radius;
+      document.getElementById('rad-val').textContent=saved.radius+'km';
+    }
+    if(saved.corridorWidth!=null){
+      document.getElementById('corridor-width').value=saved.corridorWidth;
+      document.getElementById('cw-val').textContent=saved.corridorWidth+'km';
+    }
+    if(saved.sampleKm!=null){
+      document.getElementById('sample-km').value=saved.sampleKm;
+      document.getElementById('sk-val').textContent=saved.sampleKm+'km';
+    }
+    // Re-use the existing setters (not a direct state-var assignment) so the
+    // toggle buttons' "on" styling stays in sync with the restored value,
+    // same as when a driver clicks them normally.
+    if(saved.tripMode)setTrip(saved.tripMode);
+    if(saved.searchMode)setMode(saved.searchMode);
+    if(saved.routeType)setRouteType(saved.routeType);
+    if(saved.priority)setPriority(saved.priority);
+  }
+
   // ── HTML escaping ─────────────────────────────────────────────────────────────
   // Station name/brand (NSW FuelCheck) and place names (Nominatim) are both
   // external, untrusted data - neither API guarantees its text is free of
@@ -230,6 +290,37 @@
     return [...results].sort((a,b)=>a.total-b.total);
   }
 
+  // Driver-requested "one button, it just takes me there": after a search
+  // completes, opens navigation straight to the #1 station by the CURRENT
+  // sort order (true total cost including the drive there, or the
+  // stay-on-route weighted score - whichever priority is active), not
+  // necessarily the lowest per-litre price. The full ranked list is still
+  // rendered underneath regardless (see runSearch), so nothing is hidden if
+  // this doesn't fire.
+  //
+  // HONEST LIMIT: this runs after several awaited network calls (geocode,
+  // NSW auth, TomTom, FuelCheck, per-station distance lookups), well outside
+  // the exact synchronous click handler - some browsers (mobile Safari
+  // especially) may still treat that as no longer a "real" user gesture and
+  // block it as an unwanted popup/navigation. Using a real <a target="_blank">
+  // anchor's own .click() (the same element/URL the manual "Navigate via
+  // Waze" link already uses successfully) rather than window.open() is the
+  // more browser-compatible of the two options, but this could not be tested
+  // against a real phone/browser in this environment - if it doesn't fire,
+  // the rendered list's own Navigate link for the same (visually marked
+  // "Best value") station is the guaranteed-working fallback.
+  function autoNavigateToBest(results){
+    if(!results.length)return;
+    const best=sortResults(results)[0];
+    const link=document.createElement('a');
+    link.href=`https://waze.com/ul?ll=${best.lat},${best.lon}&navigate=yes`;
+    link.target='_blank';
+    link.rel='noopener';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
   // ── Route tab UI ──────────────────────────────────────────────────────────────
   const routeLabels={fastest:'⚡ Fastest',shortest:'📏 Shortest',eco:'🌿 Eco'};
 
@@ -353,6 +444,7 @@
 
   async function runSearch(){
     clearMessages();
+    saveSettings();
     const dest=document.getElementById('dest').value.trim();
     const hasDest=dest.length>0;
 
@@ -524,6 +616,7 @@
 
       setProgress(100);
       renderResults(results,baseDist,hasDest?routeData.distKm:null,hasDest?routeData.mins:null,rt,hasDest);
+      autoNavigateToBest(results);
 
     }catch(e){showErr(e.message);}
 
@@ -570,4 +663,5 @@
   document.addEventListener('click',e=>{if(!e.target.closest('.dest-wrap'))closeAc();});
 
   // init
+  loadSettings();
   updateSummary();
